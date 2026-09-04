@@ -30,6 +30,7 @@ const TIER = {
 }
 
 const COLUMN_WIDTH = 215
+const POLL_MS = 15000
 
 function FlowNode({ data }) {
   return (
@@ -81,29 +82,45 @@ function layout(nodes) {
 }
 
 /**
- * Flagship view: the whole institute as a live graph, read from the backend.
- * Drag nodes to explore how departments, teachers and courses hang together.
+ * Flagship view: the whole institute as a live graph, read from the backend
+ * and re-synced every `POLL_MS` so admissions, new hires or new courses show
+ * up without a manual refresh. A poll only ever adds, drops or relabels
+ * nodes — any node that's still present keeps wherever it was dragged to,
+ * so the graph doesn't jump around under someone mid-explore.
  */
 export function OrgGraph({ height = 520 }) {
-  const { data, error, loading, refresh } = useApi(() => getOrgGraph(), [], {
-    nodes: [],
-    edges: [],
-  })
+  const { data, error, loading, refresh } = useApi(
+    () => getOrgGraph(),
+    [],
+    { nodes: [], edges: [] },
+    { pollMs: POLL_MS },
+  )
 
-  const initialNodes = useMemo(() => layout(data.nodes), [data.nodes])
-  const initialEdges = useMemo(
+  const computedNodes = useMemo(() => layout(data.nodes), [data.nodes])
+  const computedEdges = useMemo(
     () => data.edges.map((e) => ({ ...e, type: "smoothstep" })),
     [data.edges],
   )
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges)
 
-  // Seed the canvas once the graph arrives, and on every later refresh.
-  useEffect(() => setNodes(initialNodes), [initialNodes, setNodes])
-  useEffect(() => setEdges(initialEdges), [initialEdges, setEdges])
+  // Merge each fresh graph into the canvas: nodes that already exist keep
+  // their current (possibly dragged) position, new ones get the computed
+  // layout slot, and anything gone from the response drops off the canvas.
+  useEffect(() => {
+    setNodes((current) => {
+      const prevPosition = new Map(current.map((n) => [n.id, n.position]))
+      return computedNodes.map((n) => ({
+        ...n,
+        position: prevPosition.get(n.id) ?? n.position,
+      }))
+    })
+  }, [computedNodes, setNodes])
 
-  const reset = useCallback(() => setNodes(initialNodes), [initialNodes, setNodes])
+  useEffect(() => setEdges(computedEdges), [computedEdges, setEdges])
+
+  const reset = useCallback(() => setNodes(computedNodes), [computedNodes, setNodes])
 
   return (
     <AsyncBoundary
@@ -129,13 +146,19 @@ export function OrgGraph({ height = 520 }) {
           <Background gap={22} size={1.4} color="oklch(0.9 0.01 340)" />
           <Controls showInteractive={false} className="rounded-xl border border-border" />
         </ReactFlow>
-        <button
-          type="button"
-          onClick={reset}
-          className="absolute top-3 right-3 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
-        >
-          Reset layout
-        </button>
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+            <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-green" />
+            Live
+          </span>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+          >
+            Reset layout
+          </button>
+        </div>
       </div>
     </AsyncBoundary>
   )

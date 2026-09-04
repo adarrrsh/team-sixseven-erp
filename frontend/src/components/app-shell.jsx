@@ -1,26 +1,29 @@
-import { NavLink, useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
-import { LogOut, PanelsTopLeft } from "lucide-react"
+import { useState } from "react"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
+import { AnimatePresence, motion } from "framer-motion"
+import { LogOut, Menu, PanelsTopLeft, X } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/primitives"
 import { initials } from "@/lib/utils"
 import { cn } from "cn"
 
-function NavItem({ to, icon: Icon, label, end }) {
+function NavItem({ to, icon: Icon, label, end, onClick, className }) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onClick}
       className={({ isActive }) =>
         cn(
           "flex shrink-0 items-center gap-2 rounded-[100px] px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors",
           isActive
             ? "bg-pink-strong text-white"
             : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
+          className,
         )
       }
     >
       <Icon className="size-4 shrink-0" />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </NavLink>
   )
 }
@@ -28,25 +31,52 @@ function NavItem({ to, icon: Icon, label, end }) {
 /**
  * Shared chrome for all three portals: one fixed, pilled navbar up top —
  * brand mark, section links, identity + sign-out — and nothing else. No
- * separate top bar, no side rail. Page content fades in on mount only.
+ * separate top bar, no side rail. Below `lg` the links collapse behind a
+ * menu toggle (the pill itself would otherwise have to scroll sideways to
+ * fit every section), opening a small dropdown under the pill. Page
+ * content fades in on mount only.
  */
 export function AppShell({ user, nav, children }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [open, setOpen] = useState(false)
+  const [openedAt, setOpenedAt] = useState(location.pathname)
+  const links = nav.filter((item) => !item.heading)
+
+  // A route change means a link was just taken (or "Sign out" was hit) —
+  // either way the mobile menu should close behind it. Adjusted during
+  // render (React's recommended way to reset state on a prop change)
+  // rather than in an effect, so it takes effect in the same commit.
+  if (location.pathname !== openedAt) {
+    setOpenedAt(location.pathname)
+    setOpen(false)
+  }
+
   return (
     <div className="min-h-svh bg-background">
-      <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-        <nav className="flex max-w-full items-center gap-1 overflow-x-auto rounded-[100px] border border-border bg-card px-2 py-2 shadow-[0_8px_24px_rgba(24,10,20,0.08)]">
+      <header className="fixed inset-x-0 top-4 z-50 flex flex-col items-center px-4">
+        <nav className="flex max-w-full items-center gap-1 rounded-[100px] border border-border bg-card px-2 py-2 shadow-[0_8px_24px_rgba(24,10,20,0.08)]">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
             <PanelsTopLeft className="size-4" />
           </span>
 
           <div className="mx-1 h-5 w-px shrink-0 bg-border" />
 
-          {nav
-            .filter((item) => !item.heading)
-            .map((item) => (
+          <div className="hidden items-center gap-1 lg:flex">
+            {links.map((item) => (
               <NavItem key={item.to} {...item} />
             ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? "Close menu" : "Open menu"}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground lg:hidden"
+          >
+            {open ? <X className="size-4" /> : <Menu className="size-4" />}
+          </button>
 
           <div className="mx-1 h-5 w-px shrink-0 bg-border" />
 
@@ -62,6 +92,22 @@ export function AppShell({ user, nav, children }) {
             <LogOut className="size-4 text-muted-foreground" />
           </button>
         </nav>
+
+        <AnimatePresence>
+          {open ? (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="mt-2 flex w-56 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-3xl border border-border bg-card p-2 shadow-[0_8px_24px_rgba(24,10,20,0.08)] lg:hidden"
+            >
+              {links.map((item) => (
+                <NavItem key={item.to} {...item} onClick={() => setOpen(false)} className="w-full" />
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </header>
 
       <motion.main
