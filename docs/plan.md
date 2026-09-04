@@ -67,3 +67,5 @@ An [React Flow](https://reactflow.dev/)-based graph/tree in the admin dashboard,
 - Follow [Vercel's frontend guidelines](https://vercel.com/design/introduction)
 - No gradients, anywhere
 - No translucent background paired with text of the same underlying color (contrast must hold against the background it sits on)
+
+# every data can be downloaded in a .csv or .xlsx format (everything) 
