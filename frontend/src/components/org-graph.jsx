@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo } from "react"
 import {
+  BaseEdge,
   Background,
   Controls,
   Handle,
   Position,
   ReactFlow,
+  getBezierPath,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react"
@@ -18,26 +20,37 @@ const TONE = {
   blue: "border-blue-strong bg-blue-strong text-white",
   green: "border-green-strong bg-green-strong text-white",
   red: "border-red-strong bg-red-strong text-white",
-  white: "border-border bg-card text-foreground",
+  dark: "border-foreground bg-foreground text-background",
 }
 
-/** Each tier of the institute hierarchy gets its own row and colour. */
+/** Same four hues as the wires — every pill in the tree is solid, no neutrals. */
 const TIER = {
   institute: { y: 0, tone: "pink", label: "Institute" },
   department: { y: 145, tone: "blue", label: "Department" },
-  faculty: { y: 290, tone: "white", label: "Faculty" },
+  faculty: { y: 290, tone: "dark", label: "Faculty" },
   course: { y: 435, tone: "green", label: "Course" },
+}
+
+/** Wire colour and its flowing-dot fill, keyed by the *source* node's tier tone. */
+const EDGE_COLOR = {
+  pink: "var(--pink-strong)",
+  blue: "var(--blue-strong)",
+  green: "var(--green-strong)",
+  dark: "var(--foreground)",
+  red: "var(--red-strong)",
 }
 
 const COLUMN_WIDTH = 215
 const POLL_MS = 15000
+const DOT_COUNT = 3
+const FLOW_DURATION = 2.6
 
 function FlowNode({ data }) {
   return (
     <div
       className={cn(
         "min-w-40 rounded-2xl border px-3 py-2 text-left shadow-[0_2px_6px_rgba(24,10,20,0.06)]",
-        TONE[data.tone ?? "white"],
+        TONE[data.tone ?? "pink"],
       )}
     >
       <Handle type="target" position={Position.Top} />
@@ -52,6 +65,50 @@ function FlowNode({ data }) {
 }
 
 const nodeTypes = { erp: FlowNode }
+
+/**
+ * A structured bezier wire — curved, but anchored to the same top/bottom
+ * handles as every other edge, so a tree of them still reads as a tidy
+ * hierarchy rather than a tangle. A handful of dots travel the exact same
+ * path via the CSS motion-path API, each started mid-cycle with a negative
+ * `animation-delay` so they appear evenly spaced and already in motion on
+ * first paint (no flash-then-jump at edge start).
+ */
+function FlowEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data, markerEnd }) {
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    curvature: 0.42,
+  })
+  const color = EDGE_COLOR[data?.tone] ?? EDGE_COLOR.pink
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={{ stroke: color, strokeWidth: 1.75, opacity: 0.55 }} />
+      {Array.from({ length: DOT_COUNT }, (_, i) => {
+        const delay = (i / DOT_COUNT) * FLOW_DURATION
+        return (
+          <circle
+            key={i}
+            r="2.75"
+            fill={color}
+            style={{
+              offsetPath: `path("${edgePath}")`,
+              animation: `org-graph-flow ${FLOW_DURATION}s linear infinite`,
+              animationDelay: `-${delay.toFixed(2)}s`,
+            }}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+const edgeTypes = { flow: FlowEdge }
 
 /**
  * Lays the API's nodes out in tiers — institute, departments, faculty, courses —
@@ -97,9 +154,21 @@ export function OrgGraph({ height = 520 }) {
   )
 
   const computedNodes = useMemo(() => layout(data.nodes), [data.nodes])
+
+  // Colour each wire by the tier it leaves from (institute -> department
+  // edges are pink, department -> faculty blue, and so on).
+  const nodeTone = useMemo(
+    () => new Map(computedNodes.map((n) => [n.id, n.data.tone])),
+    [computedNodes],
+  )
   const computedEdges = useMemo(
-    () => data.edges.map((e) => ({ ...e, type: "smoothstep" })),
-    [data.edges],
+    () =>
+      data.edges.map((e) => ({
+        ...e,
+        type: "flow",
+        data: { tone: nodeTone.get(e.source) },
+      })),
+    [data.edges, nodeTone],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes)
@@ -133,10 +202,17 @@ export function OrgGraph({ height = 520 }) {
         className="relative w-full overflow-hidden rounded-2xl border border-border bg-card"
         style={{ height }}
       >
+        <style>{`
+          @keyframes org-graph-flow {
+            from { offset-distance: 0%; }
+            to { offset-distance: 100%; }
+          }
+        `}</style>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           fitView
