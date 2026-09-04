@@ -23,27 +23,67 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApi, useApiAll } from "@/lib/use-api"
 import {
-  DEPARTMENTS,
-  exams,
-  faculty as facultySeed,
-  facultyAttendanceTrend,
-  leaveRequests as leaveSeed,
-  salaries,
-  timetable,
-} from "@/lib/data"
+  assignInvigilator,
+  createFaculty,
+  decideLeave,
+  getDepartments,
+  getFaculty,
+  getFacultyAttendance,
+  getInvigilatorDuties,
+  getLeaves,
+  getSalaries,
+  getTimetable,
+} from "@/lib/api"
 import { inr } from "@/lib/utils"
 
 export default function FacultyManagement() {
-  const [faculty, setFaculty] = useState(facultySeed)
-  const [leave, setLeave] = useState(leaveSeed)
-  const [duties, setDuties] = useState(exams)
+  const { data, error, loading, setData, refresh } = useApiAll(
+    {
+      faculty: () => getFaculty(),
+      leave: () => getLeaves(),
+      duties: () => getInvigilatorDuties(),
+      salaries: () => getSalaries(),
+      attendance: () => getFacultyAttendance(),
+      timetable: () => getTimetable(),
+    },
+    [],
+    { faculty: [], leave: [], duties: [], salaries: [], attendance: null, timetable: null },
+  )
 
-  const decide = (id, status) =>
-    setLeave((ls) => ls.map((l) => (l.id === id ? { ...l, status } : l)))
+  const { faculty, leave, duties, salaries } = data
+  const attendanceTrend = data.attendance?.trend ?? []
+  const avgAttendance = faculty.length
+    ? Math.round(faculty.reduce((s, f) => s + f.attendance, 0) / faculty.length)
+    : 0
 
-  const assign = (examId, name) =>
-    setDuties((ds) => ds.map((d) => (d.id === examId ? { ...d, invigilator: name } : d)))
+  /**
+   * Approving leave also flips the teacher's status server-side, which the
+   * timetable re-staffs around — so pull both back down after a decision.
+   */
+  const decide = async (id, status) => {
+    const updated = await decideLeave(id, status)
+    setData((d) => ({
+      ...d,
+      leave: d.leave.map((l) => (l.id === id ? updated : l)),
+    }))
+    refresh()
+  }
+
+  const assign = async (examId, name) => {
+    const updated = await assignInvigilator(examId, name)
+    setData((d) => ({
+      ...d,
+      duties: d.duties.map((x) => (x.id === examId ? updated : x)),
+    }))
+  }
+
+  const addTeacher = async (payload) => {
+    const created = await createFaculty(payload)
+    setData((d) => ({ ...d, faculty: [created, ...d.faculty] }))
+  }
 
   return (
     <>
@@ -51,15 +91,17 @@ export default function FacultyManagement() {
         title="Faculty management"
         description="Directory, leave, attendance, salary and invigilation duty in one place."
       >
-        <AddTeacher onAdd={(t) => setFaculty((f) => [t, ...f])} />
+        <AddTeacher onAdd={addTeacher} />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Teachers on roll" value={faculty.length} hint="4 departments" tone="pink" />
-        <StatCard label="Pending leave" value={leave.filter((l) => l.status === "Pending").length} hint="needs a decision" tone="red" />
-        <StatCard label="Average attendance" value="89%" delta="+2%" hint="rolling 30 days" tone="green" />
-        <StatCard label="Monthly payroll" value={inr(salaries.reduce((s, r) => s + r.net, 0))} hint="net, Aug 2026" tone="blue" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Teachers on roll" value={faculty.length} hint={`${new Set(faculty.map((f) => f.dept)).size} departments`} tone="pink" />
+          <StatCard label="Pending leave" value={leave.filter((l) => l.status === "Pending").length} hint="needs a decision" tone="red" />
+          <StatCard label="Average attendance" value={`${avgAttendance}%`} hint="rolling 30 days" tone="green" />
+          <StatCard label="Monthly payroll" value={inr(salaries.reduce((s, r) => s + r.net, 0))} hint={`net, ${salaries[0]?.month ?? "current cycle"}`} tone="blue" />
+        </div>
+      </AsyncBoundary>
 
       <Tabs defaultValue="directory">
         <TabsList>
@@ -78,6 +120,7 @@ export default function FacultyManagement() {
           <DataTable
             name="teacher-registry"
             rows={faculty}
+            empty={loading ? "Loading…" : "No teachers on roll yet."}
             searchPlaceholder="Search teachers, departments or subjects…"
             columns={[
               { key: "id", header: "Staff ID" },
@@ -98,6 +141,7 @@ export default function FacultyManagement() {
           <DataTable
             name="leave-requests"
             rows={leave}
+            empty={loading ? "Loading…" : "No leave requests."}
             searchPlaceholder="Search leave requests…"
             columns={[
               { key: "id", header: "Request" },
@@ -140,12 +184,15 @@ export default function FacultyManagement() {
               <CardDescription>Institute-wide monthly average</CardDescription>
             </CardHeader>
             <CardContent>
-              <BarChart data={facultyAttendanceTrend} tone="pink" />
+              <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+                <BarChart data={attendanceTrend} tone="pink" />
+              </AsyncBoundary>
             </CardContent>
           </Card>
           <DataTable
             name="faculty-attendance"
             rows={faculty}
+            empty={loading ? "Loading…" : "No attendance recorded."}
             searchPlaceholder="Search by teacher…"
             columns={[
               { key: "id", header: "Staff ID" },
@@ -171,6 +218,7 @@ export default function FacultyManagement() {
           <DataTable
             name="faculty-salary"
             rows={salaries}
+            empty={loading ? "Loading…" : "No payroll rows for this cycle."}
             searchPlaceholder="Search payroll…"
             columns={[
               { key: "id", header: "Staff ID" },
@@ -190,7 +238,9 @@ export default function FacultyManagement() {
             title="Teaching timetable"
             description="Slot colour follows the department; free slots are open for allocation."
           >
-            <TimetableGrid data={timetable} show="faculty" />
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+              <TimetableGrid data={data.timetable?.timetable} show="faculty" />
+            </AsyncBoundary>
           </Section>
         </TabsContent>
 
@@ -198,6 +248,7 @@ export default function FacultyManagement() {
           <DataTable
             name="invigilator-duty"
             rows={duties}
+            empty={loading ? "Loading…" : "No exams to staff."}
             searchPlaceholder="Search exams…"
             columns={[
               { key: "id", header: "Exam" },
@@ -235,23 +286,29 @@ export default function FacultyManagement() {
 }
 
 function AddTeacher({ onAdd }) {
-  const [form, setForm] = useState({ name: "", dept: DEPARTMENTS[0], subject: "", email: "", phone: "", salary: "120000" })
+  const { data: departments } = useApi(() => getDepartments(), [], [])
+  const [form, setForm] = useState({ name: "", dept: "", subject: "", email: "", phone: "", salary: "120000" })
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target?.value ?? e }))
 
-  const submit = () => {
-    onAdd({
-      id: "FC-" + Math.floor(160 + Math.random() * 40),
-      name: form.name || "New teacher",
-      dept: form.dept,
-      subject: form.subject || "—",
-      email: form.email || "—",
-      phone: form.phone || "—",
-      exp: 0,
-      salary: Number(form.salary) || 0,
-      attendance: 100,
-      load: 0,
-      status: "Active",
-    })
+  const dept = form.dept || departments[0] || ""
+
+  // The staff ID is issued by the backend, which knows the highest one in use.
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await onAdd({
+        name: form.name || "New teacher",
+        dept,
+        subject: form.subject || "—",
+        email: form.email || "—",
+        phone: form.phone || "—",
+        salary: Number(form.salary) || 0,
+      })
+      setForm({ name: "", dept: "", subject: "", email: "", phone: "", salary: "120000" })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -276,12 +333,12 @@ function AddTeacher({ onAdd }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="t-dept">Department</Label>
-            <Select value={form.dept} onValueChange={(v) => setForm((f) => ({ ...f, dept: v }))}>
+            <Select value={dept} onValueChange={(v) => setForm((f) => ({ ...f, dept: v }))}>
               <SelectTrigger id="t-dept">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((d) => (
+                {departments.map((d) => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
@@ -313,8 +370,8 @@ function AddTeacher({ onAdd }) {
             </Button>
           </DialogClose>
           <DialogClose asChild>
-            <Button size="lg" onClick={submit}>
-              Create record
+            <Button size="lg" disabled={busy} onClick={submit}>
+              {busy ? "Creating…" : "Create record"}
             </Button>
           </DialogClose>
         </DialogFooter>

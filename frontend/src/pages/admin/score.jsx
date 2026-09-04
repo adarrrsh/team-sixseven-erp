@@ -18,26 +18,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { scores as scoreSeed } from "@/lib/data"
-
-const grade = (m) =>
-  m >= 90 ? "A+" : m >= 80 ? "A" : m >= 70 ? "B" : m >= 60 ? "C" : m >= 50 ? "D" : "E"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApi } from "@/lib/use-api"
+import { getScores, updateMarks } from "@/lib/api"
 
 export default function ScorePage() {
-  const [rows, setRows] = useState(scoreSeed)
+  const { data: rows, error, loading, setData: setRows, refresh } = useApi(
+    () => getScores(),
+    [],
+    [],
+  )
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState("")
+  const [busy, setBusy] = useState(false)
 
-  const save = () => {
-    const marks = Math.max(0, Math.min(100, Number(draft) || 0))
-    setRows((rs) =>
-      rs.map((r) =>
-        r.id === editing.id && r.course === editing.course
-          ? { ...r, marks, grade: grade(marks) }
-          : r,
-      ),
-    )
-    setEditing(null)
+  /** The backend clamps to 0–100 and derives the grade, so trust what it returns. */
+  const save = async () => {
+    setBusy(true)
+    try {
+      const updated = await updateMarks(editing, Number(draft) || 0)
+      setRows((rs) =>
+        rs.map((r) =>
+          r.id === updated.id && r.course === updated.course ? updated : r,
+        ),
+      )
+      setEditing(null)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const byCourse = useMemo(() => {
@@ -53,7 +61,9 @@ export default function ScorePage() {
     }))
   }, [rows])
 
-  const avg = Math.round(rows.reduce((s, r) => s + r.marks, 0) / rows.length)
+  const avg = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.marks, 0) / rows.length)
+    : 0
 
   return (
     <>
@@ -62,12 +72,14 @@ export default function ScorePage() {
         description="Marks per student and exam. Editing here updates the student's portal immediately."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Records" value={rows.length} hint="published marks" tone="pink" />
-        <StatCard label="Institute average" value={`${avg}%`} delta="+3%" hint="vs last exam" tone="green" />
-        <StatCard label="Distinctions" value={rows.filter((r) => r.marks >= 85).length} hint="85% and above" tone="blue" />
-        <StatCard label="Below pass" value={rows.filter((r) => r.marks < 50).length} hint="needs re-exam" tone="red" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Records" value={rows.length} hint="published marks" tone="pink" />
+          <StatCard label="Institute average" value={`${avg}%`} hint="across every exam" tone="green" />
+          <StatCard label="Distinctions" value={rows.filter((r) => r.marks >= 85).length} hint="85% and above" tone="blue" />
+          <StatCard label="Below pass" value={rows.filter((r) => r.marks < 50).length} hint="needs re-exam" tone="red" />
+        </div>
+      </AsyncBoundary>
 
       <Card>
         <CardHeader>
@@ -75,13 +87,16 @@ export default function ScorePage() {
           <CardDescription>Across every published exam</CardDescription>
         </CardHeader>
         <CardContent>
-          <BarChart data={byCourse} tone="blue" />
+          <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+            <BarChart data={byCourse} tone="blue" />
+          </AsyncBoundary>
         </CardContent>
       </Card>
 
       <DataTable
         name="scores"
         rows={rows}
+        empty={loading ? "Loading…" : "No marks published yet."}
         searchPlaceholder="Search students, exams or courses…"
         columns={[
           { key: "id", header: "Student ID" },
@@ -136,8 +151,8 @@ export default function ScorePage() {
                 Cancel
               </Button>
             </DialogClose>
-            <Button size="lg" onClick={save}>
-              Save marks
+            <Button size="lg" disabled={busy} onClick={save}>
+              {busy ? "Saving…" : "Save marks"}
             </Button>
           </DialogFooter>
         </DialogContent>

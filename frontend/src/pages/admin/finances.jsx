@@ -5,14 +5,36 @@ import { BarChart, SplitBars } from "@/components/charts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { admissionFees, feeCollectionTrend, salaries, studentFees } from "@/lib/data"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApiAll } from "@/lib/use-api"
+import {
+  getAdmissionFees,
+  getCollectionTrend,
+  getFinanceSummary,
+  getSalaries,
+  getStudentFees,
+} from "@/lib/api"
 import { inr } from "@/lib/utils"
 
 export default function Finances() {
-  const tuitionCollected = studentFees.reduce((s, f) => s + f.paid, 0)
-  const tuitionDue = studentFees.reduce((s, f) => s + (f.payable - f.paid), 0)
-  const admissionCollected = admissionFees.reduce((s, f) => s + f.paid, 0)
-  const payroll = salaries.reduce((s, f) => s + f.net, 0)
+  const { data, error, loading, refresh } = useApiAll(
+    {
+      summary: () => getFinanceSummary(),
+      trend: () => getCollectionTrend(),
+      studentFees: () => getStudentFees(),
+      salaries: () => getSalaries(),
+      admissionFees: () => getAdmissionFees(),
+    },
+    [],
+    { summary: null, trend: [], studentFees: [], salaries: [], admissionFees: [] },
+  )
+
+  const { studentFees, salaries, admissionFees } = data
+  const feeCollectionTrend = data.trend
+  const tuitionCollected = data.summary?.tuitionCollected ?? 0
+  const tuitionDue = data.summary?.tuitionDue ?? 0
+  const admissionCollected = data.summary?.admissionCollected ?? 0
+  const payroll = data.summary?.payroll ?? 0
 
   return (
     <>
@@ -21,12 +43,19 @@ export default function Finances() {
         description="Student fees, faculty payroll and the admission fee tracker, reconciled monthly."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Tuition collected" value={inr(tuitionCollected)} delta="+12%" hint="September" tone="green" />
-        <StatCard label="Tuition outstanding" value={inr(tuitionDue)} hint="2 overdue accounts" tone="red" />
-        <StatCard label="Admission fees" value={inr(admissionCollected)} hint="2026 – 27 intake" tone="blue" />
-        <StatCard label="Payroll (net)" value={inr(payroll)} hint="Aug 2026 cycle" tone="pink" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Tuition collected" value={inr(tuitionCollected)} hint="all heads" tone="green" />
+          <StatCard
+            label="Tuition outstanding"
+            value={inr(tuitionDue)}
+            hint={`${data.summary?.overdueAccounts ?? 0} overdue accounts`}
+            tone="red"
+          />
+          <StatCard label="Admission fees" value={inr(admissionCollected)} hint="2026 – 27 intake" tone="blue" />
+          <StatCard label="Payroll (net)" value={inr(payroll)} hint={salaries[0]?.month ?? "current cycle"} tone="pink" />
+        </div>
+      </AsyncBoundary>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -35,7 +64,9 @@ export default function Finances() {
             <CardDescription>Percentage of the month's billing collected</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={feeCollectionTrend} tone="blue" />
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <BarChart data={feeCollectionTrend} tone="blue" />
+            </AsyncBoundary>
           </CardContent>
         </Card>
         <Card>
@@ -44,6 +75,7 @@ export default function Finances() {
             <CardDescription>Current cycle</CardDescription>
           </CardHeader>
           <CardContent>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
             <SplitBars
               data={[
                 { label: "Tuition collected", value: tuitionCollected, tone: "green", display: inr(tuitionCollected) },
@@ -52,6 +84,7 @@ export default function Finances() {
                 { label: "Payroll committed", value: payroll, tone: "pink", display: inr(payroll) },
               ]}
             />
+            </AsyncBoundary>
           </CardContent>
         </Card>
       </div>
@@ -66,6 +99,7 @@ export default function Finances() {
         <TabsContent value="student">
           <DataTable
             name="finance-student-fees"
+            empty={loading ? "Loading…" : "No fee records."}
             rows={studentFees}
             searchPlaceholder="Search students or heads…"
             columns={[
@@ -85,6 +119,7 @@ export default function Finances() {
         <TabsContent value="salary">
           <DataTable
             name="finance-payroll"
+            empty={loading ? "Loading…" : "No payroll rows."}
             rows={salaries}
             searchPlaceholder="Search payroll…"
             columns={[
@@ -103,6 +138,7 @@ export default function Finances() {
         <TabsContent value="admission">
           <DataTable
             name="finance-admission-fees"
+            empty={loading ? "Loading…" : "No admission fees recorded."}
             rows={admissionFees}
             searchPlaceholder="Search applicants or references…"
             columns={[

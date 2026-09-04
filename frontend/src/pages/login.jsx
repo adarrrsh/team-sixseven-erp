@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/primitives"
 import { HeroWindow } from "@/components/hero-window"
 import { Chatbot } from "@/components/chatbot"
+import { ErrorState } from "@/components/async-boundary"
+import { useApi } from "@/lib/use-api"
+import { getDashboard, login } from "@/lib/api"
 import { cn } from "cn"
 
 const ROLES = [
@@ -19,8 +22,36 @@ const ROLES = [
 
 export default function Login() {
   const [role, setRole] = useState("admin")
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
   const active = ROLES.find((r) => r.id === role)
+
+  // Headline figures under the hero, straight from the institute record.
+  const { data: stats } = useApi(() => getDashboard(), [], null)
+
+  /**
+   * Credentials are checked by the backend, which also says which portal the
+   * account belongs to — so a faculty login cannot land on the admin console.
+   */
+  const submit = async (event) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    setBusy(true)
+    setError(null)
+    try {
+      const { user, portal } = await login(
+        form.get("email"),
+        form.get("password"),
+        role,
+      )
+      navigate(portal, { state: { user } })
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="min-h-svh bg-background">
@@ -59,9 +90,9 @@ export default function Login() {
           </div>
 
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <li>1,412 students</li>
-            <li>86 faculty</li>
-            <li>4 departments</li>
+            <li>{stats ? `${stats.counts.students} students` : "— students"}</li>
+            <li>{stats ? `${stats.counts.faculty} faculty` : "— faculty"}</li>
+            <li>{stats ? `${stats.studentsByDept.length} departments` : "— departments"}</li>
             <li>Every table exports to .csv / .xlsx</li>
           </ul>
         </motion.section>
@@ -103,19 +134,14 @@ export default function Login() {
             })}
           </div>
 
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              navigate(active.to)
-            }}
-          >
+          <form className="flex flex-col gap-4" onSubmit={submit}>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Institute email</Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   defaultValue={active.hint}
                   key={active.hint}
@@ -131,6 +157,7 @@ export default function Login() {
                 <Lock className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   defaultValue="origin-demo"
                   className="pl-9"
@@ -139,8 +166,10 @@ export default function Login() {
               </div>
             </div>
 
-            <Button type="submit" size="lg" className="h-10">
-              Sign in as {active.label}
+            {error ? <ErrorState error={error} /> : null}
+
+            <Button type="submit" size="lg" className="h-10" disabled={busy}>
+              {busy ? "Signing in…" : `Sign in as ${active.label}`}
               <ArrowRight />
             </Button>
           </form>

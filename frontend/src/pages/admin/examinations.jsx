@@ -19,12 +19,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { exams as examSeed, faculty } from "@/lib/data"
+import { AsyncBoundary, CardsSkeleton } from "@/components/async-boundary"
+import { useApiAll } from "@/lib/use-api"
+import { createExam, deleteExam, getExams, getFaculty } from "@/lib/api"
 
 export default function Examinations() {
-  const [exams, setExams] = useState(examSeed)
+  const { data, error, loading, setData, refresh } = useApiAll(
+    { exams: () => getExams(), faculty: () => getFaculty() },
+    [],
+    { exams: [], faculty: [] },
+  )
+  const exams = data.exams
 
-  const remove = (id) => setExams((xs) => xs.filter((x) => x.id !== id))
+  const remove = async (id) => {
+    await deleteExam(id)
+    setData((d) => ({ ...d, exams: d.exams.filter((x) => x.id !== id) }))
+  }
+
+  const create = async (payload) => {
+    const created = await createExam(payload)
+    setData((d) => ({ ...d, exams: [created, ...d.exams] }))
+  }
   const upcoming = exams.filter((e) => e.status !== "Completed")
   const history = exams.filter((e) => e.status === "Completed")
 
@@ -46,15 +61,17 @@ export default function Examinations() {
         title="Examinations"
         description="Create and retire exams, assign invigilators, keep the history auditable."
       >
-        <CreateExam onCreate={(e) => setExams((xs) => [e, ...xs])} />
+        <CreateExam onCreate={create} faculty={data.faculty} />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Scheduled" value={exams.filter((e) => e.status === "Scheduled").length} hint="next 30 days" tone="blue" />
-        <StatCard label="Drafts" value={exams.filter((e) => e.status === "Draft").length} hint="not published" tone="pink" />
-        <StatCard label="Completed" value={history.length} hint="this academic year" tone="green" />
-        <StatCard label="Unassigned duty" value={exams.filter((e) => e.invigilator === "Unassigned").length} hint="needs an invigilator" tone="red" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Scheduled" value={exams.filter((e) => e.status === "Scheduled").length} hint="next 30 days" tone="blue" />
+          <StatCard label="Drafts" value={exams.filter((e) => e.status === "Draft").length} hint="not published" tone="pink" />
+          <StatCard label="Completed" value={history.length} hint="this academic year" tone="green" />
+          <StatCard label="Unassigned duty" value={exams.filter((e) => e.invigilator === "Unassigned").length} hint="needs an invigilator" tone="red" />
+        </div>
+      </AsyncBoundary>
 
       <Tabs defaultValue="upcoming">
         <TabsList>
@@ -66,6 +83,7 @@ export default function Examinations() {
           <DataTable
             name="exams-upcoming"
             rows={upcoming}
+            empty={loading ? "Loading…" : "No exams scheduled."}
             searchPlaceholder="Search exams…"
             columns={[
               ...columns,
@@ -87,6 +105,7 @@ export default function Examinations() {
           <DataTable
             name="exams-history"
             rows={history}
+            empty={loading ? "Loading…" : "No completed exams yet."}
             searchPlaceholder="Search past exams…"
             columns={columns}
           />
@@ -96,7 +115,7 @@ export default function Examinations() {
   )
 }
 
-function CreateExam({ onCreate }) {
+function CreateExam({ onCreate, faculty }) {
   const [form, setForm] = useState({
     title: "",
     program: "B.Tech CSE",
@@ -108,18 +127,25 @@ function CreateExam({ onCreate }) {
   })
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target?.value ?? e }))
 
-  const submit = () =>
-    onCreate({
-      id: "EX-" + Math.floor(710 + Math.random() * 80),
-      title: form.title || "Untitled exam",
-      program: form.program,
-      date: form.date || "2026-10-01",
-      slot: form.slot,
-      room: form.room || "TBD",
-      invigilator: form.invigilator,
-      students: Number(form.students) || 0,
-      status: "Draft",
-    })
+  const [busy, setBusy] = useState(false)
+
+  // The exam ID is issued by the backend, which knows the highest one in use.
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await onCreate({
+        title: form.title || "Untitled exam",
+        program: form.program,
+        date: form.date || "2026-10-01",
+        slot: form.slot,
+        room: form.room || "TBD",
+        invigilator: form.invigilator,
+        students: Number(form.students) || 0,
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <Dialog>
@@ -192,8 +218,8 @@ function CreateExam({ onCreate }) {
             </Button>
           </DialogClose>
           <DialogClose asChild>
-            <Button size="lg" onClick={submit}>
-              Save draft
+            <Button size="lg" disabled={busy} onClick={submit}>
+              {busy ? "Saving…" : "Save draft"}
             </Button>
           </DialogClose>
         </DialogFooter>

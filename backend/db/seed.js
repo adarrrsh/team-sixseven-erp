@@ -23,6 +23,7 @@ const Fine = require("../models/Fine");
 const TimetableSlot = require("../models/TimetableSlot");
 const Metric = require("../models/Metric");
 const User = require("../models/User");
+const Payment = require("../models/Payment");
 
 const admissionRequests = [
   { id: "AD-2041", name: "Ishaan Verma", program: "B.Tech CSE", score: 94, applied: "2026-08-18", fee: 78000, status: "Pending", email: "ishaan.v@mail.com", phone: "98200 41190" },
@@ -222,6 +223,8 @@ const COLLECTIONS = [
   [TimetableSlot, timetableSlots, ["scope", "day", "period"]],
   [Metric, metrics, ["series", "label"]],
   [User, users, ["email"]],
+  // Nothing to seed, but --fresh must clear receipts from earlier runs.
+  [Payment, [], ["reference"]],
 ];
 
 async function seed({ fresh = false } = {}) {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import {
   Background,
   Controls,
@@ -8,6 +8,9 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react"
+import { AsyncBoundary, Skeleton } from "@/components/async-boundary"
+import { useApi } from "@/lib/use-api"
+import { getOrgGraph } from "@/lib/api"
 import { cn } from "cn"
 
 const TONE = {
@@ -17,6 +20,16 @@ const TONE = {
   red: "border-red-strong bg-red-strong text-white",
   white: "border-border bg-card text-foreground",
 }
+
+/** Each tier of the institute hierarchy gets its own row and colour. */
+const TIER = {
+  institute: { y: 0, tone: "pink", label: "Institute" },
+  department: { y: 145, tone: "blue", label: "Department" },
+  faculty: { y: 290, tone: "white", label: "Faculty" },
+  course: { y: 435, tone: "green", label: "Course" },
+}
+
+const COLUMN_WIDTH = 215
 
 function FlowNode({ data }) {
   return (
@@ -39,78 +52,91 @@ function FlowNode({ data }) {
 
 const nodeTypes = { erp: FlowNode }
 
-const INITIAL_NODES = [
-  { id: "campus", position: { x: 420, y: 0 }, data: { kind: "Institute", label: "Origin University", meta: "4 departments · 1,412 students", tone: "pink" } },
-  { id: "cs", position: { x: 60, y: 130 }, data: { kind: "Department", label: "Computer Science", meta: "2 faculty · 120 students", tone: "blue" } },
-  { id: "ec", position: { x: 300, y: 130 }, data: { kind: "Department", label: "Electronics", meta: "2 faculty · 96 students", tone: "blue" } },
-  { id: "me", position: { x: 545, y: 130 }, data: { kind: "Department", label: "Mechanical", meta: "1 faculty · 39 students", tone: "blue" } },
-  { id: "cm", position: { x: 785, y: 130 }, data: { kind: "Department", label: "Commerce", meta: "1 faculty · 74 students", tone: "blue" } },
+/**
+ * Lays the API's nodes out in tiers — institute, departments, faculty, courses —
+ * centring each row so the tree reads top-down.
+ */
+function layout(nodes) {
+  const rows = {}
+  for (const node of nodes) {
+    ;(rows[node.kind] ??= []).push(node)
+  }
+  const widest = Math.max(...Object.values(rows).map((r) => r.length), 1)
 
-  { id: "f118", position: { x: 0, y: 275 }, data: { kind: "Faculty", label: "Dr. Aparna Joshi", meta: "Load 18 h · 96% present", tone: "white" } },
-  { id: "f124", position: { x: 190, y: 275 }, data: { kind: "Faculty", label: "Prof. Rajat Sinha", meta: "Load 16 h · 91% present", tone: "white" } },
-  { id: "f131", position: { x: 380, y: 275 }, data: { kind: "Faculty", label: "Dr. Leela Menon", meta: "Load 14 h · 88% present", tone: "white" } },
-  { id: "f140", position: { x: 570, y: 275 }, data: { kind: "Faculty", label: "Prof. Imran Sheikh", meta: "Load 20 h · 79% present", tone: "red" } },
-  { id: "f146", position: { x: 785, y: 275 }, data: { kind: "Faculty", label: "Dr. Sneha Kulkarni", meta: "On medical leave", tone: "red" } },
-
-  { id: "cs501", position: { x: 0, y: 420 }, data: { kind: "Course", label: "CS-501 Distributed Systems", meta: "62 enrolled · Exam 14 Sep", tone: "green" } },
-  { id: "cs503", position: { x: 215, y: 420 }, data: { kind: "Course", label: "CS-503 Compiler Design", meta: "58 enrolled · Exam 14 Sep", tone: "green" } },
-  { id: "ec301", position: { x: 425, y: 420 }, data: { kind: "Course", label: "EC-301 VLSI Design", meta: "45 enrolled · Exam 15 Sep", tone: "green" } },
-  { id: "me701", position: { x: 620, y: 420 }, data: { kind: "Course", label: "ME-701 Thermodynamics II", meta: "39 enrolled · Completed", tone: "green" } },
-  { id: "cm101", position: { x: 840, y: 420 }, data: { kind: "Course", label: "CM-101 Corporate Finance", meta: "74 enrolled · Exam 2 Nov", tone: "green" } },
-]
-
-const INITIAL_EDGES = [
-  ["campus", "cs"], ["campus", "ec"], ["campus", "me"], ["campus", "cm"],
-  ["cs", "f118"], ["cs", "f124"], ["ec", "f131"], ["ec", "f124"],
-  ["me", "f140"], ["cm", "f146"],
-  ["f118", "cs501"], ["f124", "cs503"], ["f131", "ec301"],
-  ["f140", "me701"], ["f146", "cm101"],
-].map(([source, target]) => ({
-  id: `${source}-${target}`,
-  source,
-  target,
-  type: "smoothstep",
-}))
+  return Object.entries(rows).flatMap(([kind, group]) => {
+    const tier = TIER[kind] ?? TIER.course
+    const offset = ((widest - group.length) * COLUMN_WIDTH) / 2
+    return group.map((node, i) => ({
+      id: node.id,
+      type: "erp",
+      position: { x: offset + i * COLUMN_WIDTH, y: tier.y },
+      data: {
+        kind: tier.label,
+        label: node.label,
+        meta: node.meta ?? node.dept,
+        tone: tier.tone,
+      },
+    }))
+  })
+}
 
 /**
- * Flagship view: the whole institute as a live graph. Drag nodes to explore
- * how departments, teachers and courses hang together.
+ * Flagship view: the whole institute as a live graph, read from the backend.
+ * Drag nodes to explore how departments, teachers and courses hang together.
  */
 export function OrgGraph({ height = 520 }) {
-  const nodes0 = useMemo(
-    () => INITIAL_NODES.map((n) => ({ ...n, type: "erp" })),
-    [],
-  )
-  const [nodes, setNodes, onNodesChange] = useNodesState(nodes0)
-  const [edges, , onEdgesChange] = useEdgesState(INITIAL_EDGES)
+  const { data, error, loading, refresh } = useApi(() => getOrgGraph(), [], {
+    nodes: [],
+    edges: [],
+  })
 
-  const reset = useCallback(() => setNodes(nodes0), [nodes0, setNodes])
+  const initialNodes = useMemo(() => layout(data.nodes), [data.nodes])
+  const initialEdges = useMemo(
+    () => data.edges.map((e) => ({ ...e, type: "smoothstep" })),
+    [data.edges],
+  )
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  // Seed the canvas once the graph arrives, and on every later refresh.
+  useEffect(() => setNodes(initialNodes), [initialNodes, setNodes])
+  useEffect(() => setEdges(initialEdges), [initialEdges, setEdges])
+
+  const reset = useCallback(() => setNodes(initialNodes), [initialNodes, setNodes])
 
   return (
-    <div
-      className="relative w-full overflow-hidden rounded-2xl border border-border bg-card"
-      style={{ height }}
+    <AsyncBoundary
+      loading={loading}
+      error={error}
+      onRetry={refresh}
+      skeleton={<Skeleton className="w-full" style={{ height }} />}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        fitView
-        proOptions={{ hideAttribution: true }}
-        minZoom={0.35}
+      <div
+        className="relative w-full overflow-hidden rounded-2xl border border-border bg-card"
+        style={{ height }}
       >
-        <Background gap={22} size={1.4} color="oklch(0.9 0.01 340)" />
-        <Controls showInteractive={false} className="rounded-xl border border-border" />
-      </ReactFlow>
-      <button
-        type="button"
-        onClick={reset}
-        className="absolute top-3 right-3 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
-      >
-        Reset layout
-      </button>
-    </div>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          fitView
+          proOptions={{ hideAttribution: true }}
+          minZoom={0.35}
+        >
+          <Background gap={22} size={1.4} color="oklch(0.9 0.01 340)" />
+          <Controls showInteractive={false} className="rounded-xl border border-border" />
+        </ReactFlow>
+        <button
+          type="button"
+          onClick={reset}
+          className="absolute top-3 right-3 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+        >
+          Reset layout
+        </button>
+      </div>
+    </AsyncBoundary>
   )
 }

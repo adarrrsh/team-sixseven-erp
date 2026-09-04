@@ -7,14 +7,34 @@ import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/primitives"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { admissionFees, admissionRequests } from "@/lib/data"
+import { AsyncBoundary, CardsSkeleton } from "@/components/async-boundary"
+import { useApiAll } from "@/lib/use-api"
+import { decideAdmission, getAdmissionFees, getAdmissions } from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
 
 export default function Admissions() {
-  const [rows, setRows] = useState(admissionRequests)
+  const { data, error, loading, setData, refresh } = useApiAll(
+    { requests: () => getAdmissions(), fees: () => getAdmissionFees() },
+    [],
+    { requests: [], fees: [] },
+  )
+  const rows = data.requests
+  const admissionFees = data.fees
+  const [busy, setBusy] = useState(null)
 
-  const decide = (id, status) =>
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)))
+  /** Writes the decision, then swaps in the row the server returned. */
+  const decide = async (id, status) => {
+    setBusy(id)
+    try {
+      const updated = await decideAdmission(id, status)
+      setData((d) => ({
+        ...d,
+        requests: d.requests.map((r) => (r.id === id ? updated : r)),
+      }))
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const [pending, approved, rejected] = useMemo(
     () => [
@@ -43,12 +63,19 @@ export default function Admissions() {
         description="Every decision here writes to the applicant's record and their fee tracker."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Requests" value={pending.length} hint="awaiting decision" tone="pink" />
-        <StatCard label="Approved" value={approved.length} hint="seats confirmed" tone="green" />
-        <StatCard label="Rejected" value={rejected.length} hint="this intake" tone="red" />
-        <StatCard label="Fees collected" value={inr(admissionFees.reduce((s, f) => s + f.paid, 0))} hint="admission head" tone="blue" />
-      </div>
+      <AsyncBoundary
+        loading={loading}
+        error={error}
+        onRetry={refresh}
+        skeleton={<CardsSkeleton />}
+      >
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Requests" value={pending.length} hint="awaiting decision" tone="pink" />
+          <StatCard label="Approved" value={approved.length} hint="seats confirmed" tone="green" />
+          <StatCard label="Rejected" value={rejected.length} hint="this intake" tone="red" />
+          <StatCard label="Fees collected" value={inr(admissionFees.reduce((s, f) => s + f.paid, 0))} hint="admission head" tone="blue" />
+        </div>
+      </AsyncBoundary>
 
       <Tabs defaultValue="requests">
         <TabsList>
@@ -66,7 +93,7 @@ export default function Admissions() {
             name="admission-requests"
             rows={pending}
             searchPlaceholder="Search by name, programme or ID…"
-            empty="No requests waiting — nice."
+            empty={loading ? "Loading…" : "No requests waiting — nice."}
             columns={[
               ...base,
               {
@@ -75,11 +102,11 @@ export default function Admissions() {
                 export: false,
                 render: (r) => (
                   <div className="flex gap-1.5">
-                    <Button size="xs" onClick={() => decide(r.id, "Approved")}>
+                    <Button size="xs" disabled={busy === r.id} onClick={() => decide(r.id, "Approved")}>
                       <Check />
                       Approve
                     </Button>
-                    <Button size="xs" variant="destructive" onClick={() => decide(r.id, "Rejected")}>
+                    <Button size="xs" variant="destructive" disabled={busy === r.id} onClick={() => decide(r.id, "Rejected")}>
                       <X />
                       Reject
                     </Button>

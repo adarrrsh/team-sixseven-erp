@@ -23,11 +23,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { courses, exams, fines, scores, studentFees, timetable } from "@/lib/data"
-import { payStudentDue } from "@/lib/api"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApi } from "@/lib/use-api"
+import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
 import { inr } from "@/lib/utils"
 
 const ME = { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5 }
+
+/** One call returns the student plus their fees, fines, scores, courses and exams. */
+const useProfile = () => useApi(() => getStudentProfile(ME.id), [], null)
 
 const NAV = [
   { to: "/student", label: "Overview", icon: LayoutDashboard, end: true },
@@ -56,36 +60,52 @@ export default function StudentPortal() {
 }
 
 function Overview() {
-  const myScores = scores.filter((s) => s.id === ME.id)
+  const { data, error, loading, refresh } = useProfile()
+  const timetableQuery = useApi(() => getTimetable(), [], null)
+
+  const me = data?.student
+  const myScores = data?.scores ?? []
+  const nextDue = (data?.fees ?? []).find((f) => f.status !== "Paid")
+
   return (
     <>
       <PageHeader
-        title={`Hello, ${ME.name.split(" ")[0]}`}
-        description="Semester 5 · B.Tech Computer Science & Engineering"
+        title={`Hello, ${(me?.name ?? ME.name).split(" ")[0]}`}
+        description={me ? `Semester ${me.sem} · ${me.program} · ${me.dept}` : "Loading your record…"}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Attendance" value="74%" delta="-3%" hint="75% needed for exams" tone="red" />
-        <StatCard label="CGPA" value="7.10" hint="after semester 4" tone="pink" />
-        <StatCard label="Fees due" value={inr(42000)} hint="due 10 September" tone="blue" />
-        <StatCard label="Fines" value={inr(500)} hint="library overdue" tone="red" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Attendance"
+            value={me ? `${me.attendance}%` : "—"}
+            hint="75% needed for exams"
+            tone={me && me.attendance >= 75 ? "green" : "red"}
+          />
+          <StatCard label="CGPA" value={me ? me.cgpa.toFixed(2) : "—"} hint="cumulative" tone="pink" />
+          <StatCard
+            label="Fees due"
+            value={inr(me?.feesDue ?? 0)}
+            hint={nextDue ? `due ${nextDue.due}` : "nothing outstanding"}
+            tone="blue"
+          />
+          <StatCard label="Fines" value={inr(me?.fines ?? 0)} hint="unsettled" tone={me?.fines ? "red" : "green"} />
+        </div>
+      </AsyncBoundary>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Attendance by month</CardTitle>
-            <CardDescription>Semester 5 so far</CardDescription>
+            <CardTitle>Marks by course</CardTitle>
+            <CardDescription>Published results this semester</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart
-              data={[
-                { label: "Jul", value: 81 },
-                { label: "Aug", value: 76 },
-                { label: "Sep", value: 68 },
-              ]}
-              tone="red"
-            />
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <BarChart
+                data={myScores.map((s) => ({ label: s.course, value: s.marks }))}
+                tone={me && me.attendance >= 75 ? "green" : "red"}
+              />
+            </AsyncBoundary>
           </CardContent>
         </Card>
 
@@ -95,6 +115,7 @@ function Overview() {
             <CardDescription>Mid-term · Semester 5</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {loading ? <Skeleton className="h-16 w-full" /> : null}
             {myScores.map((s) => (
               <div key={s.course} className="flex items-center gap-3">
                 <Badge tone="pink">{s.course}</Badge>
@@ -114,28 +135,46 @@ function Overview() {
       </div>
 
       <Section title="This week" description="Your class timetable">
-        <TimetableGrid data={timetable} />
+        <AsyncBoundary
+          loading={timetableQuery.loading}
+          error={timetableQuery.error}
+          onRetry={timetableQuery.refresh}
+          skeleton={<Skeleton className="h-72 w-full" />}
+        >
+          <TimetableGrid
+            data={timetableQuery.data?.timetable}
+            days={timetableQuery.data?.days}
+            periods={timetableQuery.data?.periods}
+          />
+        </AsyncBoundary>
       </Section>
     </>
   )
 }
 
 function MyTimetable() {
+  const { data, error, loading, refresh } = useApi(() => getTimetable(), [], null)
   return (
     <>
       <PageHeader title="Timetable" description="Rooms update automatically when a class is reassigned." />
-      <TimetableGrid data={timetable} />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+        <TimetableGrid data={data?.timetable} days={data?.days} periods={data?.periods} />
+      </AsyncBoundary>
     </>
   )
 }
 
 function MyCourses() {
+  const { data, error, loading } = useProfile()
+  const courses = data?.courses ?? []
+  const credits = courses.reduce((n, c) => n + c.credits, 0)
   return (
     <>
-      <PageHeader title="Courses" description="Semester 5 registration — 19 credits." />
+      <PageHeader title="Courses" description={`Semester ${data?.student.sem ?? ME.sem} registration — ${credits} credits.`} />
       <DataTable
         name="my-courses"
-        rows={courses.filter((c) => c.dept === "Computer Science" || c.sem === ME.sem)}
+        rows={courses}
+        empty={loading ? "Loading…" : error ? "Could not load your courses." : "No courses registered."}
         searchPlaceholder="Search my courses…"
         columns={[
           { key: "code", header: "Code" },
@@ -150,12 +189,14 @@ function MyCourses() {
 }
 
 function MyExams() {
+  const { data, error, loading } = useProfile()
   return (
     <>
       <PageHeader title="Exams" description="Admit card is released 48 hours before each exam." />
       <DataTable
         name="my-exams"
-        rows={exams.filter((e) => e.program === ME.program)}
+        rows={data?.exams ?? []}
+        empty={loading ? "Loading…" : error ? "Could not load your exams." : "No exams scheduled."}
         searchPlaceholder="Search exams…"
         columns={[
           { key: "id", header: "Exam" },
@@ -171,13 +212,14 @@ function MyExams() {
 }
 
 function MyScore() {
-  const mine = scores.filter((s) => s.id === ME.id)
+  const { data, error, loading } = useProfile()
   return (
     <>
       <PageHeader title="Score" description="Published marks across every exam." />
       <DataTable
         name="my-score"
-        rows={mine}
+        rows={data?.scores ?? []}
+        empty={loading ? "Loading…" : error ? "Could not load your marks." : "No marks published yet."}
         searchPlaceholder="Search my marks…"
         columns={[
           { key: "exam", header: "Exam" },
@@ -197,42 +239,55 @@ function MyScore() {
 }
 
 function Fees() {
-  const [paidHeads, setPaidHeads] = useState([])
-  const myFees = studentFees
-    .filter((f) => f.id === ME.id)
-    .map((f) => (paidHeads.includes(f.head) ? { ...f, paid: f.payable, status: "Paid" } : f))
-  const myFines = fines
-    .filter((f) => f.student === ME.name)
-    .map((f) => (paidHeads.includes(f.id) ? { ...f, status: "Paid" } : f))
+  const { data, error, loading, refresh } = useProfile()
+
+  const myFees = data?.fees ?? []
+  const myFines = data?.fines ?? []
+  const tuitionDue = myFees.reduce((s, f) => s + (f.payable - f.paid), 0)
+  const finesDue = myFines
+    .filter((f) => f.status === "Unpaid")
+    .reduce((s, f) => s + f.amount, 0)
+  const paidSoFar = myFees.reduce((s, f) => s + f.paid, 0)
+
+  const nextHead = myFees.find((f) => f.status !== "Paid")
 
   return (
     <>
       <PageHeader title="Fees & fines" description="Pay semester fees and settle fines online.">
         <PayDialog
           label="Pay semester fees"
-          amount={42000}
-          head="Semester 5 tuition"
-          onPaid={() => setPaidHeads((p) => [...p, "Semester 5 tuition"])}
+          amount={nextHead ? nextHead.payable - nextHead.paid : 0}
+          head={nextHead?.head}
+          disabled={!nextHead}
+          onPaid={refresh}
         />
         <PayDialog
           label="Pay fines"
           variant="outline"
-          amount={500}
-          head="FN-201"
-          onPaid={() => setPaidHeads((p) => [...p, "FN-201"])}
+          amount={finesDue}
+          disabled={finesDue === 0}
+          onPaid={refresh}
         />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Tuition due" value={inr(myFees.reduce((s, f) => s + (f.payable - f.paid), 0))} hint="due 10 September" tone="red" />
-        <StatCard label="Fines due" value={inr(myFines.filter((f) => f.status === "Unpaid").reduce((s, f) => s + f.amount, 0))} hint="library + hostel" tone="pink" />
-        <StatCard label="Paid this year" value={inr(84000)} hint="semesters 3 – 4" tone="green" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton count={3} />}>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Tuition due"
+            value={inr(tuitionDue)}
+            hint={nextHead ? `due ${nextHead.due}` : "nothing outstanding"}
+            tone={tuitionDue ? "red" : "green"}
+          />
+          <StatCard label="Fines due" value={inr(finesDue)} hint="library + hostel" tone={finesDue ? "pink" : "green"} />
+          <StatCard label="Paid so far" value={inr(paidSoFar)} hint="all heads" tone="green" />
+        </div>
+      </AsyncBoundary>
 
       <Section title="Fee heads">
         <DataTable
           name="my-fees"
           rows={myFees}
+          empty={loading ? "Loading…" : error ? "Could not load your fees." : "No fee heads raised."}
           searchPlaceholder="Search fee heads…"
           columns={[
             { key: "head", header: "Head" },
@@ -249,7 +304,7 @@ function Fees() {
           name="my-fines"
           rows={myFines}
           searchPlaceholder="Search fines…"
-          empty="No fines — well played."
+          empty={loading ? "Loading…" : error ? "Could not load your fines." : "No fines — well played."}
           columns={[
             { key: "id", header: "Fine" },
             { key: "reason", header: "Reason" },
@@ -263,10 +318,11 @@ function Fees() {
   )
 }
 
-function PayDialog({ label, amount, head, onPaid, variant = "default" }) {
+function PayDialog({ label, amount, head, onPaid, disabled, variant = "default" }) {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
 
+  // Omitting `head` tells the backend to settle outstanding fines instead.
   const run = async () => {
     setBusy(true)
     const res = await payStudentDue({ studentId: ME.id, head, amount })
@@ -278,7 +334,7 @@ function PayDialog({ label, amount, head, onPaid, variant = "default" }) {
   return (
     <Dialog onOpenChange={(o) => !o && setDone(null)}>
       <DialogTrigger asChild>
-        <Button size="lg" variant={variant}>
+        <Button size="lg" variant={variant} disabled={disabled}>
           {label}
         </Button>
       </DialogTrigger>

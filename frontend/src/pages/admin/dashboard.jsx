@@ -8,17 +8,26 @@ import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/badge"
-import {
-  admissionRequests,
-  facultyAttendanceTrend,
-  leaveRequests,
-  studentFees,
-} from "@/lib/data"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApiAll } from "@/lib/use-api"
+import { getDashboard, getLeaves } from "@/lib/api"
 import { inr } from "@/lib/utils"
 
 export default function AdminDashboard() {
-  const pending = admissionRequests.filter((a) => a.status === "Pending")
-  const outstanding = studentFees.reduce((s, f) => s + (f.payable - f.paid), 0)
+  const { data, error, loading, refresh } = useApiAll(
+    {
+      summary: () => getDashboard(),
+      leaves: () => getLeaves({ status: "Pending" }),
+    },
+    [],
+    { summary: null, leaves: [] },
+  )
+
+  const summary = data.summary
+  const counts = summary?.counts
+  const outstanding = summary?.fees.outstanding ?? 0
+  const attendanceTrend = summary?.facultyAttendanceTrend ?? []
+  const presentToday = attendanceTrend.at(-1)?.value
 
   return (
     <>
@@ -34,12 +43,19 @@ export default function AdminDashboard() {
         </Button>
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Pending admissions" value={pending.length} hint="awaiting decision" icon={UserPlus} tone="pink" />
-        <StatCard label="Fees outstanding" value={inr(outstanding)} delta="-8%" hint="vs last month" icon={IndianRupee} tone="red" />
-        <StatCard label="Faculty present today" value="91%" delta="+4%" hint="6 of 6 departments" icon={Users} tone="green" />
-        <StatCard label="Exams this month" value="2" hint="14 & 15 September" icon={CalendarDays} tone="blue" />
-      </div>
+      <AsyncBoundary
+        loading={loading}
+        error={error}
+        onRetry={refresh}
+        skeleton={<CardsSkeleton />}
+      >
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Pending admissions" value={counts?.pendingAdmissions ?? 0} hint="awaiting decision" icon={UserPlus} tone="pink" />
+          <StatCard label="Fees outstanding" value={inr(outstanding)} hint="across all heads" icon={IndianRupee} tone="red" />
+          <StatCard label="Faculty attendance" value={presentToday != null ? `${presentToday}%` : "—"} hint={`${counts?.faculty ?? 0} on staff`} icon={Users} tone="green" />
+          <StatCard label="Exams scheduled" value={counts?.scheduledExams ?? 0} hint={`${counts?.courses ?? 0} courses running`} icon={CalendarDays} tone="blue" />
+        </div>
+      </AsyncBoundary>
 
       <Section
         title="Institute graph"
@@ -60,7 +76,14 @@ export default function AdminDashboard() {
             <CardDescription>Monthly average across all departments</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={facultyAttendanceTrend} tone="pink" />
+            <AsyncBoundary
+              loading={loading}
+              error={error}
+              onRetry={refresh}
+              skeleton={<Skeleton className="h-44 w-full" />}
+            >
+              <BarChart data={attendanceTrend} tone="pink" />
+            </AsyncBoundary>
           </CardContent>
         </Card>
 
@@ -70,13 +93,20 @@ export default function AdminDashboard() {
             <CardDescription>September, by head</CardDescription>
           </CardHeader>
           <CardContent>
-            <SplitBars
-              data={[
-                { label: "Tuition collected", value: 85000, tone: "green", display: inr(85000) },
-                { label: "Admission fees", value: 35000, tone: "blue", display: inr(35000) },
-                { label: "Outstanding", value: outstanding, tone: "red", display: inr(outstanding) },
-              ]}
-            />
+            <AsyncBoundary
+              loading={loading}
+              error={error}
+              onRetry={refresh}
+              skeleton={<Skeleton className="h-44 w-full" />}
+            >
+              <SplitBars
+                data={[
+                  { label: "Collected", value: summary?.fees.collected ?? 0, tone: "green", display: inr(summary?.fees.collected ?? 0) },
+                  { label: "Billed", value: summary?.fees.billed ?? 0, tone: "blue", display: inr(summary?.fees.billed ?? 0) },
+                  { label: "Outstanding", value: outstanding, tone: "red", display: inr(outstanding) },
+                ]}
+              />
+            </AsyncBoundary>
           </CardContent>
         </Card>
       </div>
@@ -87,7 +117,8 @@ export default function AdminDashboard() {
       >
         <DataTable
           name="pending-leave"
-          rows={leaveRequests}
+          rows={data.leaves}
+          empty={loading ? "Loading…" : "No leave awaiting a decision."}
           columns={[
             { key: "id", header: "Request" },
             { key: "name", header: "Faculty" },

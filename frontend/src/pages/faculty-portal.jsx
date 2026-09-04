@@ -23,17 +23,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApi, useApiAll } from "@/lib/use-api"
 import {
-  courses,
-  exams,
-  facultyAttendanceTrend,
-  leaveRequests,
-  scores as scoreSeed,
-  students,
-  timetable,
-} from "@/lib/data"
+  applyForLeave,
+  getCourses,
+  getExams,
+  getFacultyAttendance,
+  getLeaves,
+  getScores,
+  getStudents,
+  getTimetable,
+  markAttendance,
+  updateMarks,
+} from "@/lib/api"
 
 const ME = "Dr. Aparna Joshi"
+const MY_DEPT = "Computer Science"
 
 const NAV = [
   { to: "/faculty", label: "Today", icon: LayoutDashboard, end: true },
@@ -62,16 +68,38 @@ export default function FacultyPortal() {
 }
 
 function Today() {
-  const mine = courses.filter((c) => c.faculty === ME)
+  const { data, error, loading, refresh } = useApiAll(
+    {
+      courses: () => getCourses({ faculty: ME }),
+      attendance: () => getFacultyAttendance(),
+      timetable: () => getTimetable(),
+      duties: () => getExams(),
+    },
+    [],
+    { courses: [], attendance: null, timetable: null, duties: [] },
+  )
+
+  const mine = data.courses
+  const me = data.attendance?.faculty.find((f) => f.name === ME)
+  const grid = data.timetable?.timetable ?? {}
+  const days = data.timetable?.days ?? []
+  const todaysClasses = days.reduce(
+    (n, d) => n + (grid[d] ?? []).filter((slot) => slot?.faculty === ME).length,
+    0,
+  )
+  const myDuties = data.duties.filter((e) => e.invigilator === ME).length
+
   return (
     <>
-      <PageHeader title="Today" description="Wednesday, 2 September 2026 · 3 classes, 1 duty." />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Classes today" value="3" hint="CS-501, CS-503" tone="pink" />
-        <StatCard label="Weekly load" value="18 h" hint="2 h above average" tone="blue" />
-        <StatCard label="My attendance" value="96%" delta="+1%" hint="rolling 30 days" tone="green" />
-        <StatCard label="Marks pending" value="2" hint="Mid-term · Sem 5" tone="red" />
-      </div>
+      <PageHeader title="Today" description="Your classes, duty and attendance at a glance." />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Classes this week" value={todaysClasses} hint={mine.map((c) => c.code).join(", ") || "—"} tone="pink" />
+          <StatCard label="Courses taught" value={mine.length} hint={`${mine.reduce((n, c) => n + c.enrolled, 0)} students enrolled`} tone="blue" />
+          <StatCard label="My attendance" value={me ? `${me.attendance}%` : "—"} hint="rolling 30 days" tone="green" />
+          <StatCard label="Invigilation duty" value={myDuties} hint="assigned to me" tone="red" />
+        </div>
+      </AsyncBoundary>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -80,7 +108,9 @@ function Today() {
             <CardDescription>Monthly, as recorded by the registrar</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={facultyAttendanceTrend} tone="pink" />
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <BarChart data={data.attendance?.trend ?? []} tone="pink" />
+            </AsyncBoundary>
           </CardContent>
         </Card>
         <Card>
@@ -89,6 +119,7 @@ function Today() {
             <CardDescription>Semester 5</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {loading ? <Skeleton className="h-20 w-full" /> : null}
             {mine.map((c) => (
               <div key={c.code} className="flex flex-col gap-1.5 rounded-2xl border border-border p-3">
                 <div className="flex items-center gap-2">
@@ -105,30 +136,65 @@ function Today() {
       </div>
 
       <Section title="Next classes" description="Straight from the institute timetable">
-        <TimetableGrid data={timetable} show="faculty" highlight={ME} />
+        <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+          <TimetableGrid
+            data={grid}
+            days={data.timetable?.days}
+            periods={data.timetable?.periods}
+            show="faculty"
+            highlight={ME}
+          />
+        </AsyncBoundary>
       </Section>
     </>
   )
 }
 
 function MyTimetable() {
+  const { data, error, loading, refresh } = useApi(() => getTimetable(), [], null)
   return (
     <>
       <PageHeader title="My timetable" description="Your slots are highlighted; the rest of the grid is dimmed." />
-      <TimetableGrid data={timetable} show="faculty" highlight={ME} />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+        <TimetableGrid
+          data={data?.timetable}
+          days={data?.days}
+          periods={data?.periods}
+          show="faculty"
+          highlight={ME}
+        />
+      </AsyncBoundary>
     </>
   )
 }
 
 function ClassAttendance() {
-  const [roll, setRoll] = useState(
-    students
-      .filter((s) => s.dept === "Computer Science")
-      .map((s) => ({ ...s, today: "Present" })),
+  const { data: roll, error, loading, setData: setRoll } = useApi(
+    async () => {
+      const rows = await getStudents({ dept: MY_DEPT })
+      return rows.map((s) => ({ ...s, today: "Present" }))
+    },
+    [],
+    [],
   )
 
-  const mark = (id, value) =>
-    setRoll((rs) => rs.map((r) => (r.id === id ? { ...r, today: value } : r)))
+  /**
+   * Marking absent nudges the semester percentage down a point and persists it;
+   * the registrar sees the same figure on the admin attendance tab.
+   */
+  const mark = async (id, value) => {
+    const row = roll.find((r) => r.id === id)
+    if (!row || row.today === value) return
+
+    const next = Math.max(
+      0,
+      Math.min(100, value === "Absent" ? row.attendance - 1 : row.attendance + 1),
+    )
+    setRoll((rs) => rs.map((r) => (r.id === id ? { ...r, today: value, attendance: next } : r)))
+
+    const updated = await markAttendance(id, next)
+    setRoll((rs) => rs.map((r) => (r.id === id ? { ...updated, today: value } : r)))
+  }
 
   return (
     <>
@@ -139,6 +205,7 @@ function ClassAttendance() {
       <DataTable
         name="cs501-attendance"
         rows={roll}
+        empty={loading ? "Loading…" : error ? "Could not load the roll." : "No students in this class."}
         searchPlaceholder="Search the roll…"
         columns={[
           { key: "id", header: "Student ID" },
@@ -177,13 +244,29 @@ function ClassAttendance() {
 }
 
 function MarksEntry() {
-  const [rows, setRows] = useState(scoreSeed.filter((s) => s.course.startsWith("CS")))
+  const { data: rows, error, loading, setData: setRows } = useApi(
+    async () => {
+      const all = await getScores()
+      return all.filter((s) => s.course.startsWith("CS"))
+    },
+    [],
+    [],
+  )
   const [draft, setDraft] = useState({})
+  const [saving, setSaving] = useState(null)
 
-  const commit = (id) => {
-    const v = Number(draft[id])
-    if (Number.isNaN(v)) return
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, marks: Math.max(0, Math.min(100, v)) } : r)))
+  const commit = async (row) => {
+    const value = Number(draft[row.id])
+    if (draft[row.id] === undefined || draft[row.id] === "" || Number.isNaN(value)) return
+
+    setSaving(row.id)
+    try {
+      const updated = await updateMarks(row, value)
+      setRows((rs) => rs.map((r) => (r.recordId === updated.recordId ? updated : r)))
+      setDraft((d) => ({ ...d, [row.id]: "" }))
+    } finally {
+      setSaving(null)
+    }
   }
 
   return (
@@ -195,6 +278,7 @@ function MarksEntry() {
       <DataTable
         name="cs-marks-entry"
         rows={rows}
+        empty={loading ? "Loading…" : error ? "Could not load marks." : "No marks to enter."}
         searchPlaceholder="Search students…"
         columns={[
           { key: "id", header: "Student ID" },
@@ -216,8 +300,8 @@ function MarksEntry() {
                   placeholder={String(r.marks)}
                   onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))}
                 />
-                <Button size="xs" onClick={() => commit(r.id)}>
-                  Save
+                <Button size="xs" disabled={saving === r.id} onClick={() => commit(r)}>
+                  {saving === r.id ? "…" : "Save"}
                 </Button>
               </div>
             ),
@@ -229,18 +313,27 @@ function MarksEntry() {
 }
 
 function Leave() {
-  const [rows, setRows] = useState(leaveRequests.filter((l) => l.name === "Dr. Sneha Kulkarni" || l.name === ME))
+  const { data: rows, error, loading, setData: setRows } = useApi(
+    () => getLeaves({ name: ME }),
+    [],
+    [],
+  )
+
+  const apply = async (payload) => {
+    const created = await applyForLeave(payload)
+    setRows((rs) => [created, ...rs])
+  }
 
   return (
     <>
       <PageHeader title="Leave" description="Apply for leave and track past requests.">
-        <ApplyLeave onApply={(r) => setRows((rs) => [r, ...rs])} />
+        <ApplyLeave onApply={apply} />
       </PageHeader>
       <DataTable
         name="my-leave"
         rows={rows}
         searchPlaceholder="Search my requests…"
-        empty="No leave applied yet."
+        empty={loading ? "Loading…" : error ? "Could not load your leave." : "No leave applied yet."}
         columns={[
           { key: "id", header: "Request" },
           { key: "type", header: "Type" },
@@ -257,7 +350,26 @@ function Leave() {
 
 function ApplyLeave({ onApply }) {
   const [form, setForm] = useState({ type: "Casual", from: "", to: "", reason: "" })
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  // The request ID and the day count are worked out by the backend.
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await onApply({
+        name: ME,
+        dept: MY_DEPT,
+        type: form.type,
+        from: form.from || "2026-09-20",
+        to: form.to || "2026-09-21",
+        reason: form.reason,
+      })
+      setForm({ type: "Casual", from: "", to: "", reason: "" })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <Dialog>
@@ -290,23 +402,8 @@ function ApplyLeave({ onApply }) {
             </Button>
           </DialogClose>
           <DialogClose asChild>
-            <Button
-              size="lg"
-              onClick={() =>
-                onApply({
-                  id: "LV-" + Math.floor(3310 + Math.random() * 50),
-                  name: ME,
-                  dept: "Computer Science",
-                  type: form.type,
-                  from: form.from || "2026-09-20",
-                  to: form.to || "2026-09-21",
-                  days: 2,
-                  cover: "—",
-                  status: "Pending",
-                })
-              }
-            >
-              Submit
+            <Button size="lg" disabled={busy} onClick={submit}>
+              {busy ? "Submitting…" : "Submit"}
             </Button>
           </DialogClose>
         </DialogFooter>
@@ -316,7 +413,8 @@ function ApplyLeave({ onApply }) {
 }
 
 function Duty() {
-  const mine = exams.filter((e) => e.invigilator === ME || e.invigilator === "Prof. Rajat Sinha")
+  const { data: exams, error, loading } = useApi(() => getExams(), [], [])
+  const mine = exams.filter((e) => e.invigilator === ME)
   return (
     <>
       <PageHeader title="Invigilation duty" description="Assigned by the examinations office." />
@@ -324,7 +422,7 @@ function Duty() {
         name="my-invigilation"
         rows={mine}
         searchPlaceholder="Search duty…"
-        empty="No duty assigned."
+        empty={loading ? "Loading…" : error ? "Could not load your duty." : "No duty assigned."}
         columns={[
           { key: "id", header: "Exam" },
           { key: "title", header: "Title" },

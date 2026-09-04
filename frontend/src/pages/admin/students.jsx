@@ -21,24 +21,54 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { useApi, useApiAll } from "@/lib/use-api"
 import {
-  courses,
-  DEPARTMENTS,
-  exams,
-  fines as finesSeed,
-  scores,
-  studentFees,
-  students as studentSeed,
-  timetable,
-} from "@/lib/data"
+  createStudent,
+  getCourses,
+  getDepartments,
+  getExams,
+  getFines,
+  getScores,
+  getStudentFees,
+  getStudents,
+  getTimetable,
+  settleFine,
+} from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
 
 export default function StudentManagement() {
-  const [students, setStudents] = useState(studentSeed)
-  const [fines, setFines] = useState(finesSeed)
+  const { data, error, loading, setData, refresh } = useApiAll(
+    {
+      students: () => getStudents(),
+      fines: () => getFines(),
+      fees: () => getStudentFees(),
+      courses: () => getCourses(),
+      exams: () => getExams(),
+      scores: () => getScores(),
+      timetable: () => getTimetable(),
+    },
+    [],
+    { students: [], fines: [], fees: [], courses: [], exams: [], scores: [], timetable: null },
+  )
 
-  const settle = (id) =>
-    setFines((fs) => fs.map((f) => (f.id === id ? { ...f, status: "Paid" } : f)))
+  const { students, fines, courses, exams, scores } = data
+  const studentFees = data.fees
+
+  /** Settling a fine also decrements the student's outstanding balance. */
+  const settle = async (id) => {
+    const updated = await settleFine(id)
+    setData((d) => ({
+      ...d,
+      fines: d.fines.map((f) => (f.id === id ? updated : f)),
+    }))
+    refresh()
+  }
+
+  const addStudent = async (payload) => {
+    const created = await createStudent(payload)
+    setData((d) => ({ ...d, students: [created, ...d.students] }))
+  }
 
   const dueTotal = students.reduce((s, r) => s + r.feesDue, 0)
 
@@ -48,15 +78,22 @@ export default function StudentManagement() {
         title="Student management"
         description="Attendance, fees, courses, exams and scores for every student on roll."
       >
-        <AddStudent onAdd={(s) => setStudents((xs) => [s, ...xs])} />
+        <AddStudent onAdd={addStudent} />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Students on roll" value={students.length} hint="active this semester" tone="pink" />
-        <StatCard label="Below 75% attendance" value={students.filter((s) => s.attendance < 75).length} hint="exam-eligibility risk" tone="red" />
-        <StatCard label="Fees due" value={inr(dueTotal)} hint="across all semesters" tone="blue" />
-        <StatCard label="Average CGPA" value={(students.reduce((s, r) => s + r.cgpa, 0) / students.length).toFixed(2)} hint="all programmes" tone="green" />
-      </div>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Students on roll" value={students.length} hint="active this semester" tone="pink" />
+          <StatCard label="Below 75% attendance" value={students.filter((s) => s.attendance < 75).length} hint="exam-eligibility risk" tone="red" />
+          <StatCard label="Fees due" value={inr(dueTotal)} hint="across all semesters" tone="blue" />
+          <StatCard
+            label="Average CGPA"
+            value={students.length ? (students.reduce((s, r) => s + r.cgpa, 0) / students.length).toFixed(2) : "—"}
+            hint="all programmes"
+            tone="green"
+          />
+        </div>
+      </AsyncBoundary>
 
       <Tabs defaultValue="directory">
         <TabsList>
@@ -76,6 +113,7 @@ export default function StudentManagement() {
         <TabsContent value="directory">
           <DataTable
             name="student-registry"
+            empty={loading ? "Loading…" : "No students on roll yet."}
             rows={students}
             searchPlaceholder="Search students, programmes or IDs…"
             columns={[
@@ -96,6 +134,7 @@ export default function StudentManagement() {
         <TabsContent value="attendance">
           <DataTable
             name="student-attendance"
+            empty={loading ? "Loading…" : "No attendance recorded."}
             rows={students}
             searchPlaceholder="Search by student…"
             columns={[
@@ -125,6 +164,7 @@ export default function StudentManagement() {
         <TabsContent value="fees">
           <DataTable
             name="student-fees"
+            empty={loading ? "Loading…" : "No fee records."}
             rows={studentFees}
             searchPlaceholder="Search fee records…"
             columns={[
@@ -153,6 +193,7 @@ export default function StudentManagement() {
         <TabsContent value="fines">
           <DataTable
             name="student-fines"
+            empty={loading ? "Loading…" : "No fines raised."}
             rows={fines}
             searchPlaceholder="Search fines…"
             columns={[
@@ -182,6 +223,7 @@ export default function StudentManagement() {
         <TabsContent value="courses">
           <DataTable
             name="course-list"
+            empty={loading ? "Loading…" : "No courses."}
             rows={courses}
             searchPlaceholder="Search courses…"
             columns={[
@@ -198,13 +240,16 @@ export default function StudentManagement() {
 
         <TabsContent value="timetable">
           <Section title="Class timetable" description="Generated from teacher availability">
-            <TimetableGrid data={timetable} />
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+              <TimetableGrid data={data.timetable?.timetable} />
+            </AsyncBoundary>
           </Section>
         </TabsContent>
 
         <TabsContent value="exams">
           <DataTable
             name="student-exams"
+            empty={loading ? "Loading…" : "No exams scheduled."}
             rows={exams}
             searchPlaceholder="Search exams…"
             columns={[
@@ -223,6 +268,7 @@ export default function StudentManagement() {
         <TabsContent value="score">
           <DataTable
             name="student-scores"
+            empty={loading ? "Loading…" : "No marks published."}
             rows={scores}
             searchPlaceholder="Search scores…"
             columns={[
@@ -247,33 +293,39 @@ export default function StudentManagement() {
 }
 
 function AddStudent({ onAdd }) {
+  const { data: departments } = useApi(() => getDepartments(), [], [])
   const [form, setForm] = useState({
     name: "",
     program: "B.Tech CSE",
-    dept: DEPARTMENTS[0],
+    dept: "",
     sem: "1",
     guardian: "",
     email: "",
     phone: "",
   })
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target?.value ?? e }))
 
-  const submit = () =>
-    onAdd({
-      id: "ST-" + Math.floor(8810 + Math.random() * 80),
-      name: form.name || "New student",
-      program: form.program,
-      sem: Number(form.sem) || 1,
-      dept: form.dept,
-      attendance: 100,
-      cgpa: 0,
-      feesDue: 0,
-      fines: 0,
-      email: form.email || "—",
-      phone: form.phone || "—",
-      guardian: form.guardian || "—",
-      status: "Active",
-    })
+  const dept = form.dept || departments[0] || ""
+
+  // The student ID is issued by the backend, which knows the highest one in use.
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await onAdd({
+        name: form.name || "New student",
+        program: form.program,
+        sem: Number(form.sem) || 1,
+        dept,
+        email: form.email || "—",
+        phone: form.phone || "—",
+        guardian: form.guardian || "—",
+      })
+      setForm({ name: "", program: "B.Tech CSE", dept: "", sem: "1", guardian: "", email: "", phone: "" })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <Dialog>
@@ -312,12 +364,12 @@ function AddStudent({ onAdd }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="s-dept">Department</Label>
-            <Select value={form.dept} onValueChange={(v) => setForm((f) => ({ ...f, dept: v }))}>
+            <Select value={dept} onValueChange={(v) => setForm((f) => ({ ...f, dept: v }))}>
               <SelectTrigger id="s-dept">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((d) => (
+                {departments.map((d) => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
@@ -349,8 +401,8 @@ function AddStudent({ onAdd }) {
             </Button>
           </DialogClose>
           <DialogClose asChild>
-            <Button size="lg" onClick={submit}>
-              Enrol student
+            <Button size="lg" disabled={busy} onClick={submit}>
+              {busy ? "Enrolling…" : "Enrol student"}
             </Button>
           </DialogClose>
         </DialogFooter>
