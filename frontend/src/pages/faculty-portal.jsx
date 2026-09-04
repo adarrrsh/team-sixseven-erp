@@ -10,7 +10,7 @@ import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input, Textarea } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -32,14 +32,13 @@ import {
   getExams,
   getExamScores,
   getFacultyAttendance,
+  getFacultyMember,
   getLeaves,
   getStudents,
   getTimetable,
   updateMarks,
 } from "@/lib/api"
-
-const ME = "Dr. Aparna Joshi"
-const MY_DEPT = "Computer Science"
+import { loadSession } from "@/lib/session"
 
 const NAV = [
   { to: "/faculty", label: "Today", icon: LayoutDashboard, end: true },
@@ -53,8 +52,19 @@ const NAV = [
 ]
 
 export default function FacultyPortal() {
+  const navigate = useNavigate()
+  const session = loadSession()
+
+  // No stored session, or one that belongs to a different portal — bounce
+  // back to the login page rather than rendering someone else's data.
+  useEffect(() => {
+    if (!session || session.role !== "faculty") navigate("/", { replace: true })
+  }, [session, navigate])
+
+  if (!session) return null
+
   return (
-    <AppShell role="Faculty portal" nav={NAV} user={{ name: ME, meta: "Computer Science · FC-118" }}>
+    <AppShell role="Faculty portal" nav={NAV} user={{ name: session.name, meta: session.email }}>
       <Routes>
         <Route index element={<Today />} />
         <Route path="timetable" element={<MyTimetable />} />
@@ -69,9 +79,10 @@ export default function FacultyPortal() {
 }
 
 function Today() {
+  const session = loadSession()
   const { data, error, loading, refresh } = useApiAll(
     {
-      courses: () => getCourses({ faculty: ME }),
+      courses: () => getCourses({ faculty: session?.name }),
       attendance: () => getFacultyAttendance(),
       timetable: () => getTimetable(),
       duties: () => getExams(),
@@ -81,14 +92,14 @@ function Today() {
   )
 
   const mine = data.courses
-  const me = data.attendance?.faculty.find((f) => f.name === ME)
+  const me = data.attendance?.faculty.find((f) => f.name === session?.name)
   const grid = data.timetable?.timetable ?? {}
   const days = data.timetable?.days ?? []
   const todaysClasses = days.reduce(
-    (n, d) => n + (grid[d] ?? []).filter((slot) => slot?.faculty === ME).length,
+    (n, d) => n + (grid[d] ?? []).filter((slot) => slot?.faculty === session?.name).length,
     0,
   )
-  const myDuties = data.duties.filter((e) => e.invigilator === ME).length
+  const myDuties = data.duties.filter((e) => e.invigilator === session?.name).length
 
   return (
     <>
@@ -117,7 +128,9 @@ function Today() {
         <Card>
           <CardHeader>
             <CardTitle>My courses</CardTitle>
-            <CardDescription>Semester 5</CardDescription>
+            <CardDescription>
+              {[...new Set(mine.map((c) => c.sem))].sort().map((s) => `Sem ${s}`).join(", ") || "This semester"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {loading ? <Skeleton className="h-20 w-full" /> : null}
@@ -143,7 +156,7 @@ function Today() {
             days={data.timetable?.days}
             periods={data.timetable?.periods}
             show="faculty"
-            highlight={ME}
+            highlight={session?.name}
           />
         </AsyncBoundary>
       </Section>
@@ -152,6 +165,7 @@ function Today() {
 }
 
 function MyTimetable() {
+  const session = loadSession()
   const { data, error, loading, refresh } = useApi(() => getTimetable(), [], null)
   return (
     <>
@@ -162,19 +176,13 @@ function MyTimetable() {
           days={data?.days}
           periods={data?.periods}
           show="faculty"
-          highlight={ME}
+          highlight={session?.name}
         />
       </AsyncBoundary>
     </>
   )
 }
 
-/**
- * An Obsidian-style graph of my teaching network: the courses I teach, the
- * students in them (matched by department and semester — the same fields
- * every course/student record already carries), and my department
- * colleagues. Built entirely from endpoints other pages already call.
- */
 /**
  * An Obsidian-style graph of my teaching network, exactly two layers deep:
  * me at the centre, the courses I teach one ring out, and — a ring beyond
@@ -183,9 +191,10 @@ function MyTimetable() {
  * join the rest of the app uses to decide who's "in" a course).
  */
 function Network() {
+  const session = loadSession()
   const { data, error, loading, refresh } = useApiAll(
     {
-      courses: () => getCourses({ faculty: ME }),
+      courses: () => getCourses({ faculty: session?.name }),
       students: () => getStudents(),
     },
     [],
@@ -199,7 +208,7 @@ function Network() {
   const studentNodes = [...new Map(mine.flatMap((c) => enrolledIn(c).map((s) => [s.id, s]))).values()]
 
   const nodes = [
-    { id: "me", label: ME.replace("Dr. ", "").replace("Prof. ", ""), group: "me", val: 9 },
+    { id: "me", label: (session?.name ?? "Me").replace("Dr. ", "").replace("Prof. ", ""), group: "me", val: 9 },
     ...mine.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
     ...studentNodes.map((s) => ({ id: `student:${s.id}`, label: s.name, group: "student", val: 3 })),
   ]
@@ -347,10 +356,18 @@ function AssignScores() {
 }
 
 function Leave() {
+  const session = loadSession()
   const { data: rows, error, loading, setData: setRows } = useApi(
-    () => getLeaves({ name: ME }),
+    () => getLeaves({ name: session?.name }),
+    [session?.name],
     [],
-    [],
+  )
+  // Only the leave form needs the department — worth its own small fetch
+  // rather than threading it through every other page on this portal.
+  const { data: me } = useApi(
+    () => getFacultyMember(session?.linkedId),
+    [session?.linkedId],
+    null,
   )
 
   const apply = async (payload) => {
@@ -361,7 +378,7 @@ function Leave() {
   return (
     <>
       <PageHeader title="Leave" description="Apply for leave and track past requests.">
-        <ApplyLeave onApply={apply} />
+        <ApplyLeave onApply={apply} name={session?.name} dept={me?.dept} />
       </PageHeader>
       <DataTable
         name="my-leave"
@@ -382,7 +399,7 @@ function Leave() {
   )
 }
 
-function ApplyLeave({ onApply }) {
+function ApplyLeave({ onApply, name, dept }) {
   const [form, setForm] = useState({ type: "Casual", from: "", to: "", reason: "" })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -392,8 +409,8 @@ function ApplyLeave({ onApply }) {
     setBusy(true)
     try {
       await onApply({
-        name: ME,
-        dept: MY_DEPT,
+        name,
+        dept: dept ?? "—",
         type: form.type,
         from: form.from || "2026-09-20",
         to: form.to || "2026-09-21",
@@ -447,8 +464,9 @@ function ApplyLeave({ onApply }) {
 }
 
 function Duty() {
+  const session = loadSession()
   const { data: exams, error, loading } = useApi(() => getExams(), [], [])
-  const mine = exams.filter((e) => e.invigilator === ME)
+  const mine = exams.filter((e) => e.invigilator === session?.name)
   return (
     <>
       <PageHeader title="Invigilation duty" description="Assigned by the examinations office." />

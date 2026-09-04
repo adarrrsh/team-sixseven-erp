@@ -1,9 +1,4 @@
-/**
- * Client for the Express backend in `backend/`.
- *
- * Every reader mirrors a collection in `./data.js`, so a page can swap its
- * seed import for the matching call without reshaping a single row.
- */
+/** Client for the Express backend in `backend/` — every page's data comes through here, live. */
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 
 function query(params) {
@@ -61,6 +56,7 @@ export const decideAdmission = (id, status) =>
 /* ------------------------------------------------------------- faculty --- */
 
 export const getFaculty = (params) => get("/api/faculty", params)
+export const getFacultyMember = (id) => get(`/api/faculty/${id}`)
 export const createFaculty = (payload) => post("/api/faculty", payload)
 export const updateFaculty = (id, payload) => patch(`/api/faculty/${id}`, payload)
 export const deleteFaculty = (id) => del(`/api/faculty/${id}`)

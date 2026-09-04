@@ -48,7 +48,7 @@ export default function Login() {
         role,
       )
       saveSession(user)
-      navigate(portal, { state: { user } })
+      navigate(portal)
     } catch (err) {
       setError(err)
     } finally {

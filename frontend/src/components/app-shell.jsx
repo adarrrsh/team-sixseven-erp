@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { LogOut, Menu, PanelsTopLeft, X } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/primitives"
 import { initials } from "@/lib/utils"
+import { clearSession } from "@/lib/session"
 import { cn } from "cn"
 
 function NavItem({ to, icon: Icon, label, end, onClick, className }) {
@@ -45,6 +46,13 @@ export function AppShell({ user, nav, children }) {
   const [openedAt, setOpenedAt] = useState(location.pathname)
   const links = nav.filter((item) => !item.heading)
 
+  // Without this, the stored session outlives the portal: opening the site
+  // fresh afterwards would silently sign back in as whoever last signed out.
+  const signOut = () => {
+    clearSession()
+    navigate("/")
+  }
+
   // A route change means a link was just taken (or "Sign out" was hit) —
   // either way the mobile menu should close behind it. Adjusted during
   // render (React's recommended way to reset state on a prop change)
@@ -84,7 +92,7 @@ export function AppShell({ user, nav, children }) {
 
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={signOut}
             title="Sign out"
             className="hidden shrink-0 items-center gap-2 rounded-[100px] py-1 pr-3 pl-1 transition-colors hover:bg-secondary lg:flex"
           >
@@ -114,7 +122,7 @@ export function AppShell({ user, nav, children }) {
                 type="button"
                 onClick={() => {
                   setOpen(false)
-                  navigate("/")
+                  signOut()
                 }}
                 className="flex w-full shrink-0 items-center gap-2 rounded-[100px] px-3.5 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
               >

@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Route, Routes } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Route, Routes, useNavigate } from "react-router-dom"
 import { BookOpen, CalendarDays, ClipboardList, LayoutDashboard, Network as NetworkIcon, Trophy, Wallet } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
@@ -27,12 +27,21 @@ import {
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
 import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
+import { loadSession } from "@/lib/session"
 import { inr, pct } from "@/lib/utils"
 
-const ME = { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5 }
-
-/** One call returns the student plus their fees, fines, scores, courses and exams. */
-const useProfile = () => useApi(() => getStudentProfile(ME.id), [], null)
+/**
+ * One call returns the signed-in student plus their fees, fines, scores,
+ * courses and exams — keyed on `session.linkedId`, the Student.id the
+ * backend attached to this account at login. Every page below calls this
+ * instead of hardcoding whose record to show, so the portal always renders
+ * whoever actually signed in.
+ */
+function useProfile() {
+  const session = loadSession()
+  const query = useApi(() => getStudentProfile(session?.linkedId), [session?.linkedId], null)
+  return { ...query, session }
+}
 
 const NAV = [
   { to: "/student", label: "Overview", icon: LayoutDashboard, end: true },
@@ -47,8 +56,19 @@ const NAV = [
 ]
 
 export default function StudentPortal() {
+  const navigate = useNavigate()
+  const session = loadSession()
+
+  // No stored session, or one that belongs to a different portal — bounce
+  // back to the login page rather than rendering someone else's data.
+  useEffect(() => {
+    if (!session || session.role !== "student") navigate("/", { replace: true })
+  }, [session, navigate])
+
+  if (!session) return null
+
   return (
-    <AppShell role="Student portal" nav={NAV} user={{ name: ME.name, meta: `${ME.program} · ${ME.id}` }}>
+    <AppShell role="Student portal" nav={NAV} user={{ name: session.name, meta: session.email }}>
       <Routes>
         <Route index element={<Overview />} />
         <Route path="timetable" element={<MyTimetable />} />
@@ -63,7 +83,7 @@ export default function StudentPortal() {
 }
 
 function Overview() {
-  const { data, error, loading, refresh } = useProfile()
+  const { data, error, loading, refresh, session } = useProfile()
   const timetableQuery = useApi(() => getTimetable(), [], null)
 
   const me = data?.student
@@ -73,7 +93,7 @@ function Overview() {
   return (
     <>
       <PageHeader
-        title={`Hello, ${(me?.name ?? ME.name).split(" ")[0]}`}
+        title={`Hello, ${(me?.name ?? session?.name ?? "there").split(" ")[0]}`}
         description={me ? `Semester ${me.sem} · ${me.program} · ${me.dept}` : "Loading your record…"}
       />
 
@@ -140,7 +160,7 @@ function Overview() {
       <Card>
         <CardHeader>
           <CardTitle>CGPA tracker</CardTitle>
-          <CardDescription>Semester GPA, cumulative through semester {me?.sem ?? ME.sem}</CardDescription>
+          <CardDescription>{me ? `Semester GPA, cumulative through semester ${me.sem}` : "Semester GPA, cumulative"}</CardDescription>
         </CardHeader>
         <CardContent>
           <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
@@ -191,7 +211,7 @@ function MyCourses() {
   const credits = courses.reduce((n, c) => n + c.credits, 0)
   return (
     <>
-      <PageHeader title="Courses" description={`Semester ${data?.student.sem ?? ME.sem} registration — ${credits} credits.`} />
+      <PageHeader title="Courses" description={`Semester ${data?.student?.sem ?? "—"} registration — ${credits} credits.`} />
       <DataTable
         name="my-courses"
         rows={courses}
@@ -240,13 +260,13 @@ function MyExams() {
  * teaching faculty's name, so no extra fetch is needed.
  */
 function Network() {
-  const { data, error, loading, refresh } = useProfile()
+  const { data, error, loading, refresh, session } = useProfile()
   const me = data?.student
   const courses = data?.courses ?? []
   const facultyNames = [...new Set(courses.map((c) => c.faculty).filter(Boolean))]
 
   const nodes = [
-    { id: "me", label: (me?.name ?? ME.name).split(" ")[0], group: "me", val: 9 },
+    { id: "me", label: (me?.name ?? session?.name ?? "Me").split(" ")[0], group: "me", val: 9 },
     ...courses.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
     ...facultyNames.map((name) => ({ id: `faculty:${name}`, label: name, group: "faculty", val: 4 })),
   ]
@@ -330,7 +350,8 @@ function MyScore() {
 }
 
 function Fees() {
-  const { data, error, loading, refresh } = useProfile()
+  const { data, error, loading, refresh, session } = useProfile()
+  const studentId = data?.student?.id ?? session?.linkedId
 
   const myFees = data?.fees ?? []
   const myFines = data?.fines ?? []
@@ -347,6 +368,7 @@ function Fees() {
       <PageHeader title="Fees & fines" description="Pay semester fees and settle fines online.">
         <PayDialog
           label="Pay semester fees"
+          studentId={studentId}
           amount={nextHead ? nextHead.payable - nextHead.paid : 0}
           head={nextHead?.head}
           disabled={!nextHead}
@@ -354,6 +376,7 @@ function Fees() {
         />
         <PayDialog
           label="Pay fines"
+          studentId={studentId}
           variant="outline"
           amount={finesDue}
           disabled={finesDue === 0}
@@ -433,14 +456,14 @@ function Fees() {
   )
 }
 
-function PayDialog({ label, amount, head, onPaid, disabled, variant = "default" }) {
+function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant = "default" }) {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
 
   // Omitting `head` tells the backend to settle outstanding fines instead.
   const run = async () => {
     setBusy(true)
-    const res = await payStudentDue({ studentId: ME.id, head, amount })
+    const res = await payStudentDue({ studentId, head, amount })
     setDone(res)
     setBusy(false)
     onPaid()

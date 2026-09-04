@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom"
+import { useEffect } from "react"
+import { Outlet, useNavigate } from "react-router-dom"
 import {
   BookOpen,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
+import { loadSession } from "@/lib/session"
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -25,11 +27,21 @@ const NAV = [
 ]
 
 export default function AdminLayout() {
+  const navigate = useNavigate()
+  const session = loadSession()
+
+  // Whoever actually signed in on the login page — not a stand-in name.
+  useEffect(() => {
+    if (!session || session.role !== "admin") navigate("/", { replace: true })
+  }, [session, navigate])
+
+  if (!session) return null
+
   return (
     <AppShell
       role="Admin portal"
       nav={NAV}
-      user={{ name: "Priya Raghavan", meta: "Registrar · Admin" }}
+      user={{ name: session.name, meta: session.email }}
     >
       <Outlet />
     </AppShell>
