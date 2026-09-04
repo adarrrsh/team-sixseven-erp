@@ -89,7 +89,7 @@ export default function AdminTimetable() {
                 className={cn(
                   "flex flex-col items-start gap-0.5 rounded-2xl border px-3 py-2 text-left transition-colors",
                   off
-                    ? "border-red bg-red-soft text-red-strong"
+                    ? "border-red-strong bg-red-strong text-white"
                     : "border-border hover:bg-secondary",
                 )}
               >

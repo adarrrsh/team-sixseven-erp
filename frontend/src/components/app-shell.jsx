@@ -16,7 +16,7 @@ function NavItem({ to, icon: Icon, label, end }) {
         cn(
           "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
           isActive
-            ? "bg-pink-soft text-pink-strong"
+            ? "bg-pink-strong text-white"
             : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
         )
       }
@@ -113,7 +113,7 @@ export function AppShell({ role, user, nav, children }) {
                   cn(
                     "rounded-xl px-3 py-1.5 text-xs font-medium whitespace-nowrap",
                     isActive
-                      ? "bg-pink-soft text-pink-strong"
+                      ? "bg-pink-strong text-white"
                       : "text-muted-foreground hover:bg-secondary",
                   )
                 }

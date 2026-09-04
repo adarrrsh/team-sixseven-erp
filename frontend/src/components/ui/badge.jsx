@@ -7,10 +7,10 @@ const badgeVariants = cva(
     variants: {
       tone: {
         neutral: "bg-muted text-muted-foreground",
-        pink: "bg-pink-soft text-pink-strong",
-        red: "bg-red-soft text-red-strong",
-        green: "bg-green-soft text-green-strong",
-        blue: "bg-blue-soft text-blue-strong",
+        pink: "bg-pink-strong text-white",
+        red: "bg-red-strong text-white",
+        green: "bg-green-strong text-white",
+        blue: "bg-blue-strong text-white",
         solid: "bg-primary text-primary-foreground",
         outline: "border-border text-foreground",
       },

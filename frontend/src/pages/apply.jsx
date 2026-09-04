@@ -99,9 +99,9 @@ export default function Apply() {
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
                   i === step
-                    ? "border-pink bg-pink-soft text-pink-strong"
+                    ? "border-pink-strong bg-pink-strong text-white"
                     : i < step
-                      ? "border-green bg-green-soft text-green-strong"
+                      ? "border-green-strong bg-green-strong text-white"
                       : "border-border bg-card text-muted-foreground",
                 )}
               >
@@ -216,7 +216,7 @@ export default function Apply() {
               {step === 3 && receipt ? (
                 <div className="flex flex-col gap-5">
                   <div className="flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-2xl bg-green-soft text-green-strong">
+                    <span className="grid size-10 place-items-center rounded-2xl bg-green-strong text-white">
                       <Check className="size-5" />
                     </span>
                     <div className="flex flex-col">

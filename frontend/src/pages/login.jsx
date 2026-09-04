@@ -92,7 +92,7 @@ export default function Login() {
                   className={cn(
                     "flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
                     on
-                      ? "border-pink bg-pink-soft text-pink-strong"
+                      ? "border-pink-strong bg-pink-strong text-white"
                       : "border-border text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
                   )}
                 >

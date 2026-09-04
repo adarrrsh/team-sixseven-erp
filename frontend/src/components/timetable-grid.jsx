@@ -2,10 +2,10 @@ import { DAYS, PERIODS } from "@/lib/data"
 import { cn } from "cn"
 
 const CODE_TONE = {
-  CS: "bg-pink-soft text-pink-strong",
-  EC: "bg-blue-soft text-blue-strong",
-  ME: "bg-green-soft text-green-strong",
-  CM: "bg-red-soft text-red-strong",
+  CS: "bg-pink-strong text-white",
+  EC: "bg-blue-strong text-white",
+  ME: "bg-green-strong text-white",
+  CM: "bg-red-strong text-white",
 }
 
 /**

@@ -11,10 +11,10 @@ import {
 import { cn } from "cn"
 
 const TONE = {
-  pink: "border-pink bg-pink-soft text-pink-strong",
-  blue: "border-blue bg-blue-soft text-blue-strong",
-  green: "border-green bg-green-soft text-green-strong",
-  red: "border-red bg-red-soft text-red-strong",
+  pink: "border-pink-strong bg-pink-strong text-white",
+  blue: "border-blue-strong bg-blue-strong text-white",
+  green: "border-green-strong bg-green-strong text-white",
+  red: "border-red-strong bg-red-strong text-white",
   white: "border-border bg-card text-foreground",
 }
 

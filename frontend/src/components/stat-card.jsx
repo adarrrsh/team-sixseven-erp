@@ -3,10 +3,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "cn"
 
 const TONE = {
-  pink: { chip: "bg-pink-soft text-pink-strong", value: "text-foreground" },
-  red: { chip: "bg-red-soft text-red-strong", value: "text-foreground" },
-  green: { chip: "bg-green-soft text-green-strong", value: "text-foreground" },
-  blue: { chip: "bg-blue-soft text-blue-strong", value: "text-foreground" },
+  pink: { chip: "bg-pink-strong text-white", value: "text-foreground" },
+  red: { chip: "bg-red-strong text-white", value: "text-foreground" },
+  green: { chip: "bg-green-strong text-white", value: "text-foreground" },
+  blue: { chip: "bg-blue-strong text-white", value: "text-foreground" },
 }
 
 export function StatCard({ label, value, hint, icon: Icon, tone = "pink", delta }) {
@@ -39,8 +39,8 @@ export function StatCard({ label, value, hint, icon: Icon, tone = "pink", delta 
                     className={cn(
                       "rounded-md px-1.5 py-0.5 font-medium",
                       delta.startsWith("-")
-                        ? "bg-red-soft text-red-strong"
-                        : "bg-green-soft text-green-strong",
+                        ? "bg-red-strong text-white"
+                        : "bg-green-strong text-white",
                     )}
                   >
                     {delta}

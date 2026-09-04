@@ -291,7 +291,7 @@ function PayDialog({ label, amount, head, onPaid, variant = "default" }) {
         </DialogHeader>
 
         {done ? (
-          <div className="flex flex-col gap-2 rounded-2xl bg-green-soft p-4 text-green-strong">
+          <div className="flex flex-col gap-2 rounded-2xl bg-green-strong p-4 text-white">
             <span className="text-sm font-semibold">Payment successful</span>
             <span className="text-sm">Reference {done.reference}</span>
             {done.offline ? (
