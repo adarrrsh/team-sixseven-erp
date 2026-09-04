@@ -107,6 +107,7 @@ export const deleteCourse = (code) => del(`/api/courses/${code}`)
 /* --------------------------------------------------- exams and scores --- */
 
 export const getExams = (params) => get("/api/exams", params)
+export const getExam = (id) => get(`/api/exams/${id}`)
 export const createExam = (payload) => post("/api/exams", payload)
 export const updateExam = (id, payload) => patch(`/api/exams/${id}`, payload)
 export const deleteExam = (id) => del(`/api/exams/${id}`)

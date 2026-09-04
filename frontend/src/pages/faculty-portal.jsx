@@ -1,5 +1,5 @@
-import { Route, Routes } from "react-router-dom"
-import { CalendarDays, ClipboardList, LayoutDashboard, PenLine, Plane, Users } from "lucide-react"
+import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom"
+import { ArrowLeft, CalendarDays, ChevronRight, ClipboardList, LayoutDashboard, PenLine, Plane } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
@@ -8,7 +8,6 @@ import { BarChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/primitives"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 import { Input, Textarea } from "@/components/ui/input"
@@ -28,13 +27,12 @@ import { useApi, useApiAll } from "@/lib/use-api"
 import {
   applyForLeave,
   getCourses,
+  getExam,
   getExams,
+  getExamScores,
   getFacultyAttendance,
   getLeaves,
-  getScores,
-  getStudents,
   getTimetable,
-  markAttendance,
   updateMarks,
 } from "@/lib/api"
 
@@ -45,7 +43,6 @@ const NAV = [
   { to: "/faculty", label: "Today", icon: LayoutDashboard, end: true },
   { heading: "Teaching" },
   { to: "/faculty/timetable", label: "My timetable", icon: CalendarDays },
-  { to: "/faculty/attendance", label: "Class attendance", icon: Users },
   { to: "/faculty/marks", label: "Marks entry", icon: PenLine },
   { heading: "Me" },
   { to: "/faculty/leave", label: "Leave", icon: Plane },
@@ -58,8 +55,8 @@ export default function FacultyPortal() {
       <Routes>
         <Route index element={<Today />} />
         <Route path="timetable" element={<MyTimetable />} />
-        <Route path="attendance" element={<ClassAttendance />} />
-        <Route path="marks" element={<MarksEntry />} />
+        <Route path="marks" element={<MarksExams />} />
+        <Route path="marks/:examId" element={<AssignScores />} />
         <Route path="leave" element={<Leave />} />
         <Route path="duty" element={<Duty />} />
       </Routes>
@@ -168,74 +165,34 @@ function MyTimetable() {
   )
 }
 
-function ClassAttendance() {
-  const { data: roll, error, loading, setData: setRoll } = useApi(
-    async () => {
-      const rows = await getStudents({ dept: MY_DEPT })
-      return rows.map((s) => ({ ...s, today: "Present" }))
-    },
-    [],
-    [],
-  )
-
-  /**
-   * Marking absent nudges the semester percentage down a point and persists it;
-   * the registrar sees the same figure on the admin attendance tab.
-   */
-  const mark = async (id, value) => {
-    const row = roll.find((r) => r.id === id)
-    if (!row || row.today === value) return
-
-    const next = Math.max(
-      0,
-      Math.min(100, value === "Absent" ? row.attendance - 1 : row.attendance + 1),
-    )
-    setRoll((rs) => rs.map((r) => (r.id === id ? { ...r, today: value, attendance: next } : r)))
-
-    const updated = await markAttendance(id, next)
-    setRoll((rs) => rs.map((r) => (r.id === id ? { ...updated, today: value } : r)))
-  }
+function MarksExams() {
+  const { data: exams, error, loading } = useApi(() => getExams(), [], [])
+  const navigate = useNavigate()
 
   return (
     <>
       <PageHeader
-        title="Class attendance"
-        description="CS-501 Distributed Systems · Wednesday, period 5"
+        title="Marks entry"
+        description="Pick an exam to open its marks sheet."
       />
       <DataTable
-        name="cs501-attendance"
-        rows={roll}
-        empty={loading ? "Loading…" : error ? "Could not load the roll." : "No students in this class."}
-        searchPlaceholder="Search the roll…"
+        name="faculty-exams"
+        rows={exams}
+        onRowClick={(r) => navigate(`/faculty/marks/${r.id}`)}
+        empty={loading ? "Loading…" : error ? "Could not load exams." : "No exams scheduled."}
+        searchPlaceholder="Search exams…"
         columns={[
-          { key: "id", header: "Student ID" },
-          { key: "name", header: "Name" },
-          { key: "attendance", header: "Semester %", align: "right" },
+          { key: "id", header: "Exam" },
+          { key: "title", header: "Title" },
+          { key: "program", header: "Programme" },
+          { key: "date", header: "Date" },
+          { key: "students", header: "Students", align: "right" },
+          { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
           {
-            key: "bar",
-            header: "Semester",
+            key: "open",
+            header: "",
             export: false,
-            render: (r) => (
-              <div className="w-40">
-                <Progress value={r.attendance} tone={r.attendance >= 85 ? "green" : r.attendance >= 75 ? "pink" : "red"} />
-              </div>
-            ),
-          },
-          { key: "today", header: "Today", render: (r) => <StatusBadge value={r.today} /> },
-          {
-            key: "mark",
-            header: "Mark",
-            export: false,
-            render: (r) => (
-              <div className="flex gap-1.5">
-                <Button size="xs" variant={r.today === "Present" ? "default" : "outline"} onClick={() => mark(r.id, "Present")}>
-                  Present
-                </Button>
-                <Button size="xs" variant={r.today === "Absent" ? "destructive" : "outline"} onClick={() => mark(r.id, "Absent")}>
-                  Absent
-                </Button>
-              </div>
-            ),
+            render: () => <ChevronRight className="size-4 text-muted-foreground" />,
           },
         ]}
       />
@@ -243,27 +200,35 @@ function ClassAttendance() {
   )
 }
 
-function MarksEntry() {
-  const { data: rows, error, loading, setData: setRows } = useApi(
-    async () => {
-      const all = await getScores()
-      return all.filter((s) => s.course.startsWith("CS"))
+/** One exam's marks sheet — the rows `GET /api/exams/:id/scores` already keys to it. */
+function AssignScores() {
+  const { examId } = useParams()
+  const { data, error, loading, setData, refresh } = useApiAll(
+    {
+      exam: () => getExam(examId),
+      scores: () => getExamScores(examId),
     },
-    [],
-    [],
+    [examId],
+    { exam: null, scores: [] },
   )
+  const exam = data.exam
+  const rows = data.scores
+
   const [draft, setDraft] = useState({})
   const [saving, setSaving] = useState(null)
 
   const commit = async (row) => {
-    const value = Number(draft[row.id])
-    if (draft[row.id] === undefined || draft[row.id] === "" || Number.isNaN(value)) return
+    const value = Number(draft[row.recordId])
+    if (draft[row.recordId] === undefined || draft[row.recordId] === "" || Number.isNaN(value)) return
 
-    setSaving(row.id)
+    setSaving(row.recordId)
     try {
       const updated = await updateMarks(row, value)
-      setRows((rs) => rs.map((r) => (r.recordId === updated.recordId ? updated : r)))
-      setDraft((d) => ({ ...d, [row.id]: "" }))
+      setData((d) => ({
+        ...d,
+        scores: d.scores.map((r) => (r.recordId === updated.recordId ? updated : r)),
+      }))
+      setDraft((d) => ({ ...d, [row.recordId]: "" }))
     } finally {
       setSaving(null)
     }
@@ -272,42 +237,52 @@ function MarksEntry() {
   return (
     <>
       <PageHeader
-        title="Marks entry"
-        description="Mid-term · Semester 5. Marks publish to students once the registrar approves."
-      />
-      <DataTable
-        name="cs-marks-entry"
-        rows={rows}
-        empty={loading ? "Loading…" : error ? "Could not load marks." : "No marks to enter."}
-        searchPlaceholder="Search students…"
-        columns={[
-          { key: "id", header: "Student ID" },
-          { key: "name", header: "Name" },
-          { key: "course", header: "Course" },
-          { key: "marks", header: "Current", align: "right", render: (r) => `${r.marks} / 100` },
-          {
-            key: "entry",
-            header: "New marks",
-            export: false,
-            render: (r) => (
-              <div className="flex items-center gap-1.5">
-                <Input
-                  className="h-8 w-20"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={draft[r.id] ?? ""}
-                  placeholder={String(r.marks)}
-                  onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))}
-                />
-                <Button size="xs" disabled={saving === r.id} onClick={() => commit(r)}>
-                  {saving === r.id ? "…" : "Save"}
-                </Button>
-              </div>
-            ),
-          },
-        ]}
-      />
+        title={exam?.title ?? "Marks sheet"}
+        description={exam ? `${exam.program} · ${exam.date} · ${rows.length} scored` : "Loading exam…"}
+      >
+        <Button asChild variant="outline" size="lg">
+          <Link to="/faculty/marks">
+            <ArrowLeft />
+            All exams
+          </Link>
+        </Button>
+      </PageHeader>
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
+        <DataTable
+          name={`exam-${examId}-scores`}
+          rows={rows}
+          empty="No scores recorded for this exam yet."
+          searchPlaceholder="Search students…"
+          columns={[
+            { key: "id", header: "Student ID" },
+            { key: "name", header: "Name" },
+            { key: "course", header: "Course" },
+            { key: "grade", header: "Grade" },
+            { key: "marks", header: "Current", align: "right", render: (r) => `${r.marks} / ${r.max}` },
+            {
+              key: "entry",
+              header: "New marks",
+              export: false,
+              render: (r) => (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    className="h-8 w-20"
+                    type="number"
+                    min="0"
+                    max={r.max}
+                    value={draft[r.recordId] ?? ""}
+                    placeholder={String(r.marks)}
+                    onChange={(e) => setDraft((d) => ({ ...d, [r.recordId]: e.target.value }))}
+                  />
+                  <Button size="xs" disabled={saving === r.recordId} onClick={() => commit(r)}>
+                    {saving === r.recordId ? "…" : "Save"}
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </AsyncBoundary>
     </>
   )
 }

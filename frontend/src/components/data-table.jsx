@@ -24,6 +24,8 @@ import { cn } from "cn"
 /**
  * columns: [{ key, header, render?, align? }]
  * Search spans every column key. Every table exports to .csv / .xlsx.
+ * Pass `onRowClick(row)` to make every row navigable — it gets a pointer
+ * cursor on top of the row hover already built into `TableRow`.
  */
 export function DataTable({
   name,
@@ -33,6 +35,7 @@ export function DataTable({
   toolbar,
   empty,
   className,
+  onRowClick,
 }) {
   const [q, setQ] = useState("")
 
@@ -111,7 +114,11 @@ export function DataTable({
             </TableEmpty>
           ) : (
             filtered.map((row, i) => (
-              <TableRow key={row.id ?? row.code ?? i}>
+              <TableRow
+                key={row.id ?? row.code ?? i}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={onRowClick ? "cursor-pointer" : undefined}
+              >
                 {columns.map((c) => (
                   <TableCell
                     key={c.key}
