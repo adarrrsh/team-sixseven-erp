@@ -140,12 +140,13 @@ function Overview() {
           <CardDescription>Semester GPA, cumulative through semester {me?.sem ?? ME.sem}</CardDescription>
         </CardHeader>
         <CardContent>
-          <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+          <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
             <LineChart
               data={(me?.sgpaTrend ?? []).map((s) => ({ label: `Sem ${s.sem}`, value: s.gpa }))}
               max={10}
               suffix=""
               tone="pink"
+              height={260}
             />
           </AsyncBoundary>
         </CardContent>
@@ -228,14 +229,47 @@ function MyExams() {
   )
 }
 
+const GRADE_ORDER = ["A+", "A", "B", "C", "D", "E"]
+const GRADE_TONE = { "A+": "green", A: "green", B: "blue", C: "pink", D: "red", E: "red" }
+
 function MyScore() {
-  const { data, error, loading } = useProfile()
+  const { data, error, loading, refresh } = useProfile()
+  const rows = data?.scores ?? []
+
+  const byGrade = GRADE_ORDER.map((g) => ({
+    label: g,
+    value: rows.filter((r) => r.grade === g).length,
+    tone: GRADE_TONE[g],
+  })).filter((d) => d.value > 0)
+
   return (
     <>
       <PageHeader title="Score" description="Published marks across every exam." />
+
+      {byGrade.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Grade distribution</CardTitle>
+            <CardDescription>Across every published exam</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
+              <DonutChart
+                data={byGrade}
+                centerValue={rows.length}
+                centerLabel="results"
+                size={240}
+                thickness={30}
+                className="justify-center"
+              />
+            </AsyncBoundary>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <DataTable
         name="my-score"
-        rows={data?.scores ?? []}
+        rows={rows}
         empty={loading ? "Loading…" : error ? "Could not load your marks." : "No marks published yet."}
         searchPlaceholder="Search my marks…"
         columns={[
@@ -307,7 +341,7 @@ function Fees() {
             <CardDescription>Across every fee head this semester</CardDescription>
           </CardHeader>
           <CardContent>
-            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
               <DonutChart
                 data={[
                   { label: "Paid", value: paidSoFar, tone: "green", display: inr(paidSoFar) },
@@ -315,6 +349,9 @@ function Fees() {
                 ]}
                 centerValue={`${pct(paidSoFar, paidSoFar + tuitionDue)}%`}
                 centerLabel="paid"
+                size={240}
+                thickness={30}
+                className="justify-center"
               />
             </AsyncBoundary>
           </CardContent>
