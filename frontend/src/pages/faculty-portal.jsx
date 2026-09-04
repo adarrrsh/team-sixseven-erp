@@ -31,7 +31,6 @@ import {
   getExam,
   getExams,
   getExamScores,
-  getFaculty,
   getFacultyAttendance,
   getLeaves,
   getStudents,
@@ -176,34 +175,39 @@ function MyTimetable() {
  * every course/student record already carries), and my department
  * colleagues. Built entirely from endpoints other pages already call.
  */
+/**
+ * An Obsidian-style graph of my teaching network, exactly two layers deep:
+ * me at the centre, the courses I teach one ring out, and — a ring beyond
+ * that — the students actually enrolled in each one (matched by a course's
+ * own department and semester against the full student roster, the same
+ * join the rest of the app uses to decide who's "in" a course).
+ */
 function Network() {
   const { data, error, loading, refresh } = useApiAll(
     {
       courses: () => getCourses({ faculty: ME }),
-      colleagues: () => getFaculty({ dept: MY_DEPT }),
-      students: () => getStudents({ dept: MY_DEPT }),
+      students: () => getStudents(),
     },
     [],
-    { courses: [], colleagues: [], students: [] },
+    { courses: [], students: [] },
   )
 
   const mine = data.courses
-  const colleagues = data.colleagues.filter((f) => f.name !== ME)
-  const mySems = new Set(mine.map((c) => c.sem))
-  const classmates = data.students.filter((s) => mySems.has(s.sem))
+  const enrolledIn = (course) =>
+    data.students.filter((s) => s.dept === course.dept && s.sem === course.sem)
+
+  const studentNodes = [...new Map(mine.flatMap((c) => enrolledIn(c).map((s) => [s.id, s]))).values()]
 
   const nodes = [
     { id: "me", label: ME.replace("Dr. ", "").replace("Prof. ", ""), group: "me", val: 9 },
     ...mine.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
-    ...colleagues.map((f) => ({ id: `faculty:${f.id}`, label: f.name, group: "colleague", val: 4 })),
-    ...classmates.map((s) => ({ id: `student:${s.id}`, label: s.name, group: "student", val: 3 })),
+    ...studentNodes.map((s) => ({ id: `student:${s.id}`, label: s.name, group: "student", val: 3 })),
   ]
 
   const links = [
     ...mine.map((c) => ({ source: "me", target: `course:${c.code}` })),
-    ...colleagues.map((f) => ({ source: "me", target: `faculty:${f.id}` })),
     ...mine.flatMap((c) =>
-      classmates.filter((s) => s.sem === c.sem).map((s) => ({ source: `course:${c.code}`, target: `student:${s.id}` })),
+      enrolledIn(c).map((s) => ({ source: `course:${c.code}`, target: `student:${s.id}` })),
     ),
   ]
 
@@ -211,10 +215,10 @@ function Network() {
     <>
       <PageHeader
         title="Network"
-        description="Courses I teach, students in them, and my department colleagues — drag, scroll to zoom, click a node to focus."
+        description="Courses I teach, and the students enrolled in each one — drag, scroll to zoom, click a node to focus."
       />
-      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[420px] w-full" />}>
-        <KnowledgeGraph nodes={nodes} links={links} />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[640px] w-full" />}>
+        <KnowledgeGraph nodes={nodes} links={links} height={640} />
       </AsyncBoundary>
     </>
   )

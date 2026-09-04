@@ -14,7 +14,6 @@ const GLOW = {
   course: "#5b9dff",
   faculty: "#ff6fae",
   student: "#4ade80",
-  colleague: "#ff8a65",
 }
 
 const BG = "#0b0b10"

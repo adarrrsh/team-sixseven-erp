@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
-import { getStudentProfile, getStudents, getTimetable, payStudentDue } from "@/lib/api"
+import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
 
 const ME = { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5 }
@@ -233,46 +233,37 @@ function MyExams() {
 }
 
 /**
- * An Obsidian-style graph of my academic network: the courses I'm
- * registered for, the faculty teaching them, and my classmates — other
- * students sharing my department and semester. Built entirely from
- * endpoints other pages already call, once my own department and semester
- * are known from the profile.
+ * An Obsidian-style graph of my academic network, exactly two layers deep:
+ * me at the centre, the courses I'm registered for one ring out, and the
+ * one professor teaching each course a ring beyond that. Built entirely
+ * from the profile's own `courses` list — each course already carries its
+ * teaching faculty's name, so no extra fetch is needed.
  */
 function Network() {
   const { data, error, loading, refresh } = useProfile()
   const me = data?.student
   const courses = data?.courses ?? []
-
-  const classmatesQuery = useApi(
-    () => (me ? getStudents({ dept: me.dept, sem: me.sem }) : Promise.resolve([])),
-    [me?.dept, me?.sem],
-    [],
-  )
-  const classmates = classmatesQuery.data.filter((s) => s.id !== me?.id)
   const facultyNames = [...new Set(courses.map((c) => c.faculty).filter(Boolean))]
 
   const nodes = [
     { id: "me", label: (me?.name ?? ME.name).split(" ")[0], group: "me", val: 9 },
     ...courses.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
     ...facultyNames.map((name) => ({ id: `faculty:${name}`, label: name, group: "faculty", val: 4 })),
-    ...classmates.map((s) => ({ id: `student:${s.id}`, label: s.name.split(" ")[0], group: "student", val: 3 })),
   ]
 
   const links = [
     ...courses.map((c) => ({ source: "me", target: `course:${c.code}` })),
     ...courses.filter((c) => c.faculty).map((c) => ({ source: `course:${c.code}`, target: `faculty:${c.faculty}` })),
-    ...classmates.map((s) => ({ source: "me", target: `student:${s.id}` })),
   ]
 
   return (
     <>
       <PageHeader
         title="Network"
-        description="My courses, the faculty teaching them, and my classmates — drag, scroll to zoom, click a node to focus."
+        description="My courses, and the professor teaching each one — drag, scroll to zoom, click a node to focus."
       />
-      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[420px] w-full" />}>
-        <KnowledgeGraph nodes={nodes} links={links} />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[640px] w-full" />}>
+        <KnowledgeGraph nodes={nodes} links={links} height={640} />
       </AsyncBoundary>
     </>
   )
