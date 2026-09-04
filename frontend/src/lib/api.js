@@ -151,11 +151,22 @@ export async function payStudentDue(payload) {
 
 export const getPayments = (params) => get("/api/payments", params)
 
+/**
+ * `fetch()` itself rejects with a `TypeError` when the network request never
+ * reaches a server at all (offline, backend down, DNS failure, CORS block).
+ * `request()` above throws a plain `Error` once it *has* a response and the
+ * backend deliberately rejected it (bad amount, unknown student, ...) — that
+ * distinction is exactly what decides whether the fake local receipt below
+ * is appropriate. Only genuine unreachability should ever produce one; a
+ * real rejection from a reachable backend must reach the caller as itself,
+ * or a broken payment would render as a successful one.
+ */
 async function pay(path, payload) {
   try {
     const data = await post(path, payload)
     return { ...data, offline: false }
-  } catch {
+  } catch (err) {
+    if (!(err instanceof TypeError)) throw err
     await new Promise((r) => setTimeout(r, 900))
     return {
       ok: true,

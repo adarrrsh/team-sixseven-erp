@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { PenLine } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
@@ -18,52 +18,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
-import { useApi } from "@/lib/use-api"
-import { getScores, updateMarks } from "@/lib/api"
+import { AsyncBoundary, CardsSkeleton, ErrorState, Skeleton } from "@/components/async-boundary"
+import { useApiAll } from "@/lib/use-api"
+import { getScores, getScoresByCourse, getScoreStats, updateMarks } from "@/lib/api"
 
 export default function ScorePage() {
-  const { data: rows, error, loading, setData: setRows, refresh } = useApi(
-    () => getScores(),
+  const { data, error, loading, setData, refresh } = useApiAll(
+    {
+      rows: () => getScores(),
+      stats: () => getScoreStats(),
+      byCourse: () => getScoresByCourse(),
+    },
     [],
-    [],
+    { rows: [], stats: null, byCourse: [] },
   )
+  const rows = data.rows
+  const stats = data.stats ?? { records: 0, average: 0, distinctions: 0, belowPass: 0 }
+
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState("")
   const [busy, setBusy] = useState(false)
+  const [saveError, setSaveError] = useState(null)
 
   /** The backend clamps to 0–100 and derives the grade, so trust what it returns. */
   const save = async () => {
     setBusy(true)
+    setSaveError(null)
     try {
       const updated = await updateMarks(editing, Number(draft) || 0)
-      setRows((rs) =>
-        rs.map((r) =>
-          r.id === updated.id && r.course === updated.course ? updated : r,
-        ),
-      )
+      setData((d) => ({
+        ...d,
+        rows: d.rows.map((r) => (r.id === updated.id && r.course === updated.course ? updated : r)),
+      }))
       setEditing(null)
+      refresh() // the stat cards and by-course chart are server-aggregated — pull them fresh too
+    } catch (err) {
+      setSaveError(err)
     } finally {
       setBusy(false)
     }
   }
-
-  const byCourse = useMemo(() => {
-    const map = new Map()
-    rows.forEach((r) => {
-      const list = map.get(r.course) ?? []
-      list.push(r.marks)
-      map.set(r.course, list)
-    })
-    return [...map.entries()].map(([label, marks]) => ({
-      label,
-      value: Math.round(marks.reduce((a, b) => a + b, 0) / marks.length),
-    }))
-  }, [rows])
-
-  const avg = rows.length
-    ? Math.round(rows.reduce((s, r) => s + r.marks, 0) / rows.length)
-    : 0
 
   return (
     <>
@@ -74,10 +68,10 @@ export default function ScorePage() {
 
       <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<CardsSkeleton />}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Records" value={rows.length} hint="published marks" tone="pink" />
-          <StatCard label="Institute average" value={`${avg}%`} hint="across every exam" tone="green" />
-          <StatCard label="Distinctions" value={rows.filter((r) => r.marks >= 85).length} hint="85% and above" tone="blue" />
-          <StatCard label="Below pass" value={rows.filter((r) => r.marks < 50).length} hint="needs re-exam" tone="red" />
+          <StatCard label="Records" value={stats.records} hint="published marks" tone="pink" />
+          <StatCard label="Institute average" value={`${stats.average}%`} hint="across every exam" tone="green" />
+          <StatCard label="Distinctions" value={stats.distinctions} hint="85% and above" tone="blue" />
+          <StatCard label="Below pass" value={stats.belowPass} hint="needs re-exam" tone="red" />
         </div>
       </AsyncBoundary>
 
@@ -89,7 +83,7 @@ export default function ScorePage() {
           </CardHeader>
           <CardContent>
             <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-              <BarChart data={byCourse} tone="blue" />
+              <BarChart data={data.byCourse} tone="blue" />
             </AsyncBoundary>
           </CardContent>
         </Card>
@@ -100,7 +94,7 @@ export default function ScorePage() {
           </CardHeader>
           <CardContent className="flex items-center justify-center">
             <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-              <RadialGauge value={avg} tone={avg >= 60 ? "green" : "red"} label="average score" />
+              <RadialGauge value={stats.average} tone={stats.average >= 60 ? "green" : "red"} label="average score" />
             </AsyncBoundary>
           </CardContent>
         </Card>
@@ -146,7 +140,15 @@ export default function ScorePage() {
         ]}
       />
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditing(null)
+            setSaveError(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Update marks</DialogTitle>
@@ -158,6 +160,9 @@ export default function ScorePage() {
             <Label htmlFor="marks">Marks out of 100</Label>
             <Input id="marks" type="number" min="0" max="100" value={draft} onChange={(e) => setDraft(e.target.value)} />
           </div>
+
+          {saveError ? <ErrorState error={saveError} /> : null}
+
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" size="lg">

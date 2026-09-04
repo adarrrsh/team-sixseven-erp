@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { AsyncBoundary, CardsSkeleton, ErrorState, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
 import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
 import { loadSession } from "@/lib/session"
@@ -459,18 +459,32 @@ function Fees() {
 function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant = "default" }) {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
+  const [error, setError] = useState(null)
 
   // Omitting `head` tells the backend to settle outstanding fines instead.
   const run = async () => {
     setBusy(true)
-    const res = await payStudentDue({ studentId, head, amount })
-    setDone(res)
-    setBusy(false)
-    onPaid()
+    setError(null)
+    try {
+      const res = await payStudentDue({ studentId, head, amount })
+      setDone(res)
+      onPaid()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <Dialog onOpenChange={(o) => !o && setDone(null)}>
+    <Dialog
+      onOpenChange={(o) => {
+        if (!o) {
+          setDone(null)
+          setError(null)
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="lg" variant={variant} disabled={disabled}>
           {label}
@@ -508,6 +522,8 @@ function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant =
             </div>
           </div>
         )}
+
+        {error ? <ErrorState error={error} /> : null}
 
         <DialogFooter>
           {done ? (

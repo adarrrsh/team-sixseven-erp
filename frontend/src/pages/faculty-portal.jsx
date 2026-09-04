@@ -1,5 +1,5 @@
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom"
-import { ArrowLeft, CalendarDays, ChevronRight, ClipboardList, LayoutDashboard, Network as NetworkIcon, PenLine, Plane } from "lucide-react"
+import { ArrowLeft, CalendarDays, ChevronRight, ClipboardList, LayoutDashboard, Network as NetworkIcon, PenLine, Plane, Plus } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useEffect, useState } from "react"
 import { Input, Textarea } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogClose,
@@ -23,7 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { AsyncBoundary, CardsSkeleton, ErrorState, Skeleton } from "@/components/async-boundary"
 import { useApi, useApiAll } from "@/lib/use-api"
 import {
   applyForLeave,
@@ -36,6 +37,7 @@ import {
   getLeaves,
   getStudents,
   getTimetable,
+  publishScore,
   updateMarks,
 } from "@/lib/api"
 import { loadSession } from "@/lib/session"
@@ -308,6 +310,15 @@ function AssignScores() {
         title={exam?.title ?? "Marks sheet"}
         description={exam ? `${exam.program} · ${exam.date} · ${rows.length} scored` : "Loading exam…"}
       >
+        {exam ? (
+          <AddScore
+            exam={exam}
+            existingRows={rows}
+            onAdded={(created) =>
+              setData((d) => ({ ...d, scores: [created, ...d.scores.filter((r) => r.recordId !== created.recordId)] }))
+            }
+          />
+        ) : null}
         <Button asChild variant="outline" size="lg">
           <Link to="/faculty/marks">
             <ArrowLeft />
@@ -352,6 +363,145 @@ function AssignScores() {
         />
       </AsyncBoundary>
     </>
+  )
+}
+
+/**
+ * `GET /exams/:id/scores` only ever returns students who already have a
+ * score row — there was no way, anywhere in the app, to grade someone for
+ * the first time (the backend's `POST /scores` upsert existed but nothing
+ * called it). This closes that gap: pick one of my own courses, pick a
+ * student in that course's cohort who isn't already on the sheet, enter
+ * their marks.
+ */
+function AddScore({ exam, existingRows, onAdded }) {
+  const session = loadSession()
+  const { data: myCourses } = useApi(() => getCourses({ faculty: session?.name }), [session?.name], [])
+
+  const [courseCode, setCourseCode] = useState("")
+  const [studentId, setStudentId] = useState("")
+  const [marks, setMarks] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const course = myCourses.find((c) => c.code === courseCode)
+  const rosterQuery = useApi(
+    () => (course ? getStudents({ dept: course.dept, sem: course.sem }) : Promise.resolve([])),
+    [course?.dept, course?.sem],
+    [],
+  )
+  const alreadyScored = new Set(existingRows.filter((r) => r.course === courseCode).map((r) => r.id))
+  const unscored = rosterQuery.data.filter((s) => !alreadyScored.has(s.id))
+
+  const reset = () => {
+    setCourseCode("")
+    setStudentId("")
+    setMarks("")
+    setError(null)
+  }
+
+  const submit = async () => {
+    const student = rosterQuery.data.find((s) => s.id === studentId)
+    if (!course || !student || marks === "") return
+    setBusy(true)
+    setError(null)
+    try {
+      const created = await publishScore({
+        id: student.id,
+        name: student.name,
+        program: student.program,
+        course: course.code,
+        exam: exam.title,
+        marks: Number(marks) || 0,
+        max: 100,
+      })
+      onAdded(created)
+      setStudentId("")
+      setMarks("")
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog onOpenChange={(o) => !o && reset()}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="lg">
+          <Plus />
+          Add score
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add a score</DialogTitle>
+          <DialogDescription>For a student not yet on this exam's sheet.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="as-course">Course</Label>
+            <Select
+              value={courseCode}
+              onValueChange={(v) => {
+                setCourseCode(v)
+                setStudentId("")
+              }}
+            >
+              <SelectTrigger id="as-course">
+                <SelectValue placeholder="Pick one of my courses" />
+              </SelectTrigger>
+              <SelectContent>
+                {myCourses.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.code} · {c.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="as-student">Student</Label>
+            <Select value={studentId} onValueChange={setStudentId} disabled={!course}>
+              <SelectTrigger id="as-student">
+                <SelectValue placeholder={course ? "Pick a student" : "Pick a course first"} />
+              </SelectTrigger>
+              <SelectContent>
+                {unscored.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} · {s.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="as-marks">Marks out of 100</Label>
+            <Input
+              id="as-marks"
+              type="number"
+              min="0"
+              max="100"
+              value={marks}
+              onChange={(e) => setMarks(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error ? <ErrorState error={error} /> : null}
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" size="lg">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button size="lg" disabled={busy || !course || !studentId || marks === ""} onClick={submit}>
+            {busy ? "Saving…" : "Add score"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -400,13 +550,20 @@ function Leave() {
 }
 
 function ApplyLeave({ onApply, name, dept }) {
+  const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ type: "Casual", from: "", to: "", reason: "" })
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  // The request ID and the day count are worked out by the backend.
+  // The request ID and the day count are worked out by the backend. The
+  // dialog only closes itself once that request actually succeeds — a
+  // rejection (validation error, unreachable backend) stays on screen with
+  // the reason, instead of the old behaviour of closing regardless and
+  // dropping the error silently.
   const submit = async () => {
     setBusy(true)
+    setError(null)
     try {
       await onApply({
         name,
@@ -417,13 +574,16 @@ function ApplyLeave({ onApply, name, dept }) {
         reason: form.reason,
       })
       setForm({ type: "Casual", from: "", to: "", reason: "" })
+      setOpen(false)
+    } catch (err) {
+      setError(err)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setError(null) }}>
       <DialogTrigger asChild>
         <Button size="lg">Apply for leave</Button>
       </DialogTrigger>
@@ -446,17 +606,18 @@ function ApplyLeave({ onApply, name, dept }) {
             <Textarea id="l-reason" value={form.reason} onChange={set("reason")} placeholder="Conference in Bengaluru" />
           </div>
         </div>
+
+        {error ? <ErrorState error={error} /> : null}
+
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" size="lg">
               Cancel
             </Button>
           </DialogClose>
-          <DialogClose asChild>
-            <Button size="lg" disabled={busy} onClick={submit}>
-              {busy ? "Submitting…" : "Submit"}
-            </Button>
-          </DialogClose>
+          <Button size="lg" disabled={busy} onClick={submit}>
+            {busy ? "Submitting…" : "Submit"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
