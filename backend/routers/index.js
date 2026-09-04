@@ -1,0 +1,17 @@
+const express = require("express");
+
+const router = express.Router();
+
+router.use("/auth", require("./auth"));
+router.use("/admissions", require("./admissions"));
+router.use("/faculty", require("./faculty"));
+router.use("/students", require("./students"));
+router.use("/courses", require("./courses"));
+router.use("/exams", require("./exams"));
+router.use("/scores", require("./scores"));
+router.use("/finances", require("./finances"));
+router.use("/timetable", require("./timetable"));
+router.use("/payments", require("./payments"));
+router.use("/dashboard", require("./dashboard"));
+
+module.exports = router;
