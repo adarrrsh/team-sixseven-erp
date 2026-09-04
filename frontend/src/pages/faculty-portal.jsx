@@ -1,10 +1,11 @@
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom"
-import { ArrowLeft, CalendarDays, ChevronRight, ClipboardList, LayoutDashboard, PenLine, Plane } from "lucide-react"
+import { ArrowLeft, CalendarDays, ChevronRight, ClipboardList, LayoutDashboard, Network as NetworkIcon, PenLine, Plane } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
 import { LineChart } from "@/components/charts"
+import { KnowledgeGraph } from "@/components/knowledge-graph"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
@@ -30,8 +31,10 @@ import {
   getExam,
   getExams,
   getExamScores,
+  getFaculty,
   getFacultyAttendance,
   getLeaves,
+  getStudents,
   getTimetable,
   updateMarks,
 } from "@/lib/api"
@@ -44,6 +47,7 @@ const NAV = [
   { heading: "Teaching" },
   { to: "/faculty/timetable", label: "My timetable", icon: CalendarDays },
   { to: "/faculty/marks", label: "Marks entry", icon: PenLine },
+  { to: "/faculty/network", label: "Network", icon: NetworkIcon },
   { heading: "Me" },
   { to: "/faculty/leave", label: "Leave", icon: Plane },
   { to: "/faculty/duty", label: "Invigilation duty", icon: ClipboardList },
@@ -57,6 +61,7 @@ export default function FacultyPortal() {
         <Route path="timetable" element={<MyTimetable />} />
         <Route path="marks" element={<MarksExams />} />
         <Route path="marks/:examId" element={<AssignScores />} />
+        <Route path="network" element={<Network />} />
         <Route path="leave" element={<Leave />} />
         <Route path="duty" element={<Duty />} />
       </Routes>
@@ -160,6 +165,56 @@ function MyTimetable() {
           show="faculty"
           highlight={ME}
         />
+      </AsyncBoundary>
+    </>
+  )
+}
+
+/**
+ * An Obsidian-style graph of my teaching network: the courses I teach, the
+ * students in them (matched by department and semester — the same fields
+ * every course/student record already carries), and my department
+ * colleagues. Built entirely from endpoints other pages already call.
+ */
+function Network() {
+  const { data, error, loading, refresh } = useApiAll(
+    {
+      courses: () => getCourses({ faculty: ME }),
+      colleagues: () => getFaculty({ dept: MY_DEPT }),
+      students: () => getStudents({ dept: MY_DEPT }),
+    },
+    [],
+    { courses: [], colleagues: [], students: [] },
+  )
+
+  const mine = data.courses
+  const colleagues = data.colleagues.filter((f) => f.name !== ME)
+  const mySems = new Set(mine.map((c) => c.sem))
+  const classmates = data.students.filter((s) => mySems.has(s.sem))
+
+  const nodes = [
+    { id: "me", label: ME.replace("Dr. ", "").replace("Prof. ", ""), group: "me", val: 9 },
+    ...mine.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
+    ...colleagues.map((f) => ({ id: `faculty:${f.id}`, label: f.name, group: "colleague", val: 4 })),
+    ...classmates.map((s) => ({ id: `student:${s.id}`, label: s.name, group: "student", val: 3 })),
+  ]
+
+  const links = [
+    ...mine.map((c) => ({ source: "me", target: `course:${c.code}` })),
+    ...colleagues.map((f) => ({ source: "me", target: `faculty:${f.id}` })),
+    ...mine.flatMap((c) =>
+      classmates.filter((s) => s.sem === c.sem).map((s) => ({ source: `course:${c.code}`, target: `student:${s.id}` })),
+    ),
+  ]
+
+  return (
+    <>
+      <PageHeader
+        title="Network"
+        description="Courses I teach, students in them, and my department colleagues — drag, scroll to zoom, click a node to focus."
+      />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[420px] w-full" />}>
+        <KnowledgeGraph nodes={nodes} links={links} />
       </AsyncBoundary>
     </>
   )

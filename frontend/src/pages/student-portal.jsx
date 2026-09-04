@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { Route, Routes } from "react-router-dom"
-import { BookOpen, CalendarDays, ClipboardList, LayoutDashboard, Trophy, Wallet } from "lucide-react"
+import { BookOpen, CalendarDays, ClipboardList, LayoutDashboard, Network as NetworkIcon, Trophy, Wallet } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
 import { BarChart, DonutChart, LineChart } from "@/components/charts"
+import { KnowledgeGraph } from "@/components/knowledge-graph"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
-import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
+import { getStudentProfile, getStudents, getTimetable, payStudentDue } from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
 
 const ME = { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5 }
@@ -40,6 +41,7 @@ const NAV = [
   { to: "/student/courses", label: "Courses", icon: BookOpen },
   { to: "/student/exams", label: "Exams", icon: ClipboardList },
   { to: "/student/score", label: "Score", icon: Trophy },
+  { to: "/student/network", label: "Network", icon: NetworkIcon },
   { heading: "Money" },
   { to: "/student/fees", label: "Fees & fines", icon: Wallet },
 ]
@@ -53,6 +55,7 @@ export default function StudentPortal() {
         <Route path="courses" element={<MyCourses />} />
         <Route path="exams" element={<MyExams />} />
         <Route path="score" element={<MyScore />} />
+        <Route path="network" element={<Network />} />
         <Route path="fees" element={<Fees />} />
       </Routes>
     </AppShell>
@@ -225,6 +228,52 @@ function MyExams() {
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
         ]}
       />
+    </>
+  )
+}
+
+/**
+ * An Obsidian-style graph of my academic network: the courses I'm
+ * registered for, the faculty teaching them, and my classmates — other
+ * students sharing my department and semester. Built entirely from
+ * endpoints other pages already call, once my own department and semester
+ * are known from the profile.
+ */
+function Network() {
+  const { data, error, loading, refresh } = useProfile()
+  const me = data?.student
+  const courses = data?.courses ?? []
+
+  const classmatesQuery = useApi(
+    () => (me ? getStudents({ dept: me.dept, sem: me.sem }) : Promise.resolve([])),
+    [me?.dept, me?.sem],
+    [],
+  )
+  const classmates = classmatesQuery.data.filter((s) => s.id !== me?.id)
+  const facultyNames = [...new Set(courses.map((c) => c.faculty).filter(Boolean))]
+
+  const nodes = [
+    { id: "me", label: (me?.name ?? ME.name).split(" ")[0], group: "me", val: 9 },
+    ...courses.map((c) => ({ id: `course:${c.code}`, label: c.code, group: "course", val: 6 })),
+    ...facultyNames.map((name) => ({ id: `faculty:${name}`, label: name, group: "faculty", val: 4 })),
+    ...classmates.map((s) => ({ id: `student:${s.id}`, label: s.name.split(" ")[0], group: "student", val: 3 })),
+  ]
+
+  const links = [
+    ...courses.map((c) => ({ source: "me", target: `course:${c.code}` })),
+    ...courses.filter((c) => c.faculty).map((c) => ({ source: `course:${c.code}`, target: `faculty:${c.faculty}` })),
+    ...classmates.map((s) => ({ source: "me", target: `student:${s.id}` })),
+  ]
+
+  return (
+    <>
+      <PageHeader
+        title="Network"
+        description="My courses, the faculty teaching them, and my classmates — drag, scroll to zoom, click a node to focus."
+      />
+      <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-[420px] w-full" />}>
+        <KnowledgeGraph nodes={nodes} links={links} />
+      </AsyncBoundary>
     </>
   )
 }
