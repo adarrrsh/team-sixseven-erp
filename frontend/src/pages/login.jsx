@@ -176,11 +176,11 @@ export default function Login() {
 
           <Separator />
 
-          <div className="flex flex-col gap-2.5 rounded-2xl bg-secondary p-4">
-            <span className="text-sm font-medium text-secondary-foreground">
+          <div className="flex flex-col gap-2.5 rounded-2xl bg-pink-strong p-4">
+            <span className="text-sm font-medium text-white">
               New here?
             </span>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white">
               Applications for the 2026 – 27 intake close on 30 September.
             </p>
             <Button asChild variant="outline" size="lg" className="w-fit">
