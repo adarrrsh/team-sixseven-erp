@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ArrowRight, GraduationCap, Lock, Mail, PanelsTopLeft, ShieldCheck, Users } from "lucide-react"
+import { ArrowRight, FileText, GraduationCap, Lock, Mail, PanelsTopLeft, ShieldCheck, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,12 +12,14 @@ import { Chatbot } from "@/components/chatbot"
 import { ErrorState } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
 import { getDashboard, login } from "@/lib/api"
+import { saveSession } from "@/lib/session"
 import { cn } from "cn"
 
 const ROLES = [
   { id: "admin", label: "Admin", icon: ShieldCheck, to: "/admin", hint: "registrar@origin.edu" },
   { id: "faculty", label: "Faculty", icon: Users, to: "/faculty", hint: "aparna.joshi@origin.edu" },
   { id: "student", label: "Student", icon: GraduationCap, to: "/student", hint: "aisha.s@origin.edu" },
+  { id: "applicant", label: "Applicant", icon: FileText, to: "/applicant", hint: "ishaan.v@mail.com" },
 ]
 
 export default function Login() {
@@ -45,6 +47,7 @@ export default function Login() {
         form.get("password"),
         role,
       )
+      saveSession(user)
       navigate(portal, { state: { user } })
     } catch (err) {
       setError(err)
@@ -110,7 +113,7 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Portal">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label="Portal">
             {ROLES.map((r) => {
               const on = r.id === role
               return (

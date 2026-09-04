@@ -77,13 +77,21 @@ router.patch(
     if (!["Pending", "Approved", "Rejected"].includes(status)) {
       throw badRequest("status must be Pending, Approved or Rejected");
     }
-    const row = await Admission.findOneAndUpdate(
-      { id: req.params.id },
-      { status },
-      { new: true },
-    );
-    if (!row) throw notFound("Admission");
-    res.json(row);
+
+    const existing = await Admission.findOne({ id: req.params.id });
+    if (!existing) throw notFound("Admission");
+
+    // Once the seat fee has cleared the student is enrolled; the decision stands.
+    if (existing.feeStatus === "Paid" && status !== existing.status) {
+      throw badRequest(
+        "This seat is already confirmed and paid for — the decision cannot be changed",
+      );
+    }
+
+    existing.status = status;
+    existing.decidedAt = new Date().toISOString().slice(0, 10);
+    await existing.save();
+    res.json(existing);
   }),
 );
 

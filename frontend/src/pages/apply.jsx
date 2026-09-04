@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowLeft, ArrowRight, Check, CreditCard, Download, Lock } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, Lock, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input, Textarea } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,22 +15,27 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Chatbot } from "@/components/chatbot"
-import { payApplicationFee } from "@/lib/api"
-import { downloadCsv } from "@/lib/export"
+import { ErrorState } from "@/components/async-boundary"
+import { useApi } from "@/lib/use-api"
+import { getProgrammeFees, registerApplicant } from "@/lib/api"
+import { saveSession } from "@/lib/session"
 import { inr } from "@/lib/utils"
 import { cn } from "cn"
 
-const PROGRAMS = [
-  { id: "B.Tech CSE", fee: 2500 },
-  { id: "B.Tech ECE", fee: 2500 },
-  { id: "B.Tech MECH", fee: 2200 },
-  { id: "B.Com Hons", fee: 1500 },
-]
+const STEPS = ["Applicant", "Programme", "Account"]
 
-const STEPS = ["Applicant", "Programme", "Payment", "Receipt"]
-
+/**
+ * The admission form. It opens an applicant account and files the request —
+ * no money changes hands here. The seat fee only becomes payable from the
+ * applicant portal once the registrar approves.
+ */
 export default function Apply() {
+  const navigate = useNavigate()
+  const { data: programmes } = useApi(() => getProgrammeFees(), [], [])
+
   const [step, setStep] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -40,29 +45,32 @@ export default function Apply() {
     board: "",
     percentage: "",
     statement: "",
-    card: "4242 4242 4242 4242",
-    expiry: "09/29",
-    cvv: "123",
+    password: "",
   })
-  const [busy, setBusy] = useState(false)
-  const [receipt, setReceipt] = useState(null)
 
-  const set = (k) => (e) =>
-    setForm((f) => ({ ...f, [k]: e.target?.value ?? e }))
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target?.value ?? e }))
+  const seatFee = programmes.find((p) => p.program === form.program)?.seatFee
 
-  const fee = PROGRAMS.find((p) => p.id === form.program)?.fee ?? 2500
-
-  const pay = async () => {
+  const submit = async () => {
     setBusy(true)
-    const res = await payApplicationFee({
-      name: form.name,
-      email: form.email,
-      program: form.program,
-      amount: fee,
-    })
-    setReceipt(res)
-    setBusy(false)
-    setStep(3)
+    setError(null)
+    try {
+      const { application } = await registerApplicant({
+        ...form,
+        percentage: Number(form.percentage) || 0,
+      })
+      saveSession({
+        email: form.email,
+        name: form.name,
+        role: "applicant",
+        linkedId: application.id,
+      })
+      navigate("/applicant")
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -87,8 +95,9 @@ export default function Apply() {
             Apply for admission
           </h1>
           <p className="text-sm text-muted-foreground">
-            Four steps, about four minutes. The application fee is
-            non-refundable and payable online.
+            Three steps, about four minutes. Nothing is payable now — if the
+            registrar approves your application, the seat fee becomes payable
+            from your applicant portal.
           </p>
         </div>
 
@@ -99,9 +108,9 @@ export default function Apply() {
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
                   i === step
-                    ? "border-pink-strong bg-pink-strong text-white"
+                    ? "border-pink bg-pink-soft text-pink-strong"
                     : i < step
-                      ? "border-green-strong bg-green-strong text-white"
+                      ? "border-green bg-green-soft text-green-strong"
                       : "border-border bg-card text-muted-foreground",
                 )}
               >
@@ -138,7 +147,7 @@ export default function Apply() {
                       <Input id="phone" value={form.phone} onChange={set("phone")} placeholder="98200 00000" />
                     </Field>
                   </div>
-                  <Nav onNext={() => setStep(1)} />
+                  <Nav onNext={() => setStep(1)} nextDisabled={!form.name || !form.email} />
                 </>
               ) : null}
 
@@ -151,9 +160,9 @@ export default function Apply() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PROGRAMS.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.id} · {inr(p.fee)} fee
+                          {programmes.map((p) => (
+                            <SelectItem key={p.program} value={p.program}>
+                              {p.program} · {inr(p.seatFee)} seat fee
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -169,6 +178,12 @@ export default function Apply() {
                   <Field label="Why this programme?" id="statement">
                     <Textarea id="statement" value={form.statement} onChange={set("statement")} placeholder="A short paragraph — 100 words is plenty." />
                   </Field>
+                  {seatFee ? (
+                    <p className="text-xs text-muted-foreground">
+                      Seat fee for this programme is {inr(seatFee)}, payable only
+                      after approval.
+                    </p>
+                  ) : null}
                   <Nav onBack={() => setStep(0)} onNext={() => setStep(2)} />
                 </>
               ) : null}
@@ -178,98 +193,43 @@ export default function Apply() {
                   <div className="flex flex-col gap-4 rounded-2xl border border-border p-4">
                     <div className="flex items-center gap-2">
                       <Lock className="size-4 text-green" />
-                      <span className="text-sm font-medium">Dummy gateway · test mode</span>
-                      <Badge tone="blue" className="ml-auto">
-                        {inr(fee)} due
-                      </Badge>
+                      <span className="text-sm font-medium">
+                        Create your applicant login
+                      </span>
                     </div>
                     <Separator />
-                    <div className="grid gap-4 sm:grid-cols-[1.4fr_0.8fr_0.8fr]">
-                      <Field label="Card number" id="card">
-                        <Input id="card" value={form.card} onChange={set("card")} inputMode="numeric" />
+                    <p className="text-sm text-muted-foreground">
+                      Sign in with this to track your application. We will show
+                      the registrar's decision here as soon as it is made.
+                    </p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Email" id="acc-email">
+                        <Input id="acc-email" value={form.email} onChange={set("email")} type="email" />
                       </Field>
-                      <Field label="Expiry" id="expiry">
-                        <Input id="expiry" value={form.expiry} onChange={set("expiry")} />
-                      </Field>
-                      <Field label="CVV" id="cvv">
-                        <Input id="cvv" value={form.cvv} onChange={set("cvv")} />
+                      <Field label="Choose a password" id="password">
+                        <Input id="password" type="password" value={form.password} onChange={set("password")} placeholder="At least 6 characters" />
                       </Field>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      No real charge is made. The request is posted to the campus
-                      backend at <code className="rounded-md bg-muted px-1.5 py-0.5">/api/payments/admission</code>.
-                    </p>
                   </div>
+
+                  {error ? <ErrorState error={error} /> : null}
+
                   <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="lg" onClick={() => setStep(1)}>
                       <ArrowLeft />
                       Back
                     </Button>
-                    <Button size="lg" className="h-10" disabled={busy} onClick={pay}>
-                      <CreditCard />
-                      {busy ? "Processing…" : `Pay ${inr(fee)}`}
+                    <Button
+                      size="lg"
+                      className="h-10"
+                      disabled={busy || !form.email || form.password.length < 6}
+                      onClick={submit}
+                    >
+                      <Send />
+                      {busy ? "Submitting…" : "Submit application"}
                     </Button>
                   </div>
                 </>
-              ) : null}
-
-              {step === 3 && receipt ? (
-                <div className="flex flex-col gap-5">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-2xl bg-green-strong text-white">
-                      <Check className="size-5" />
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-semibold">Application submitted</span>
-                      <span className="text-sm text-muted-foreground">
-                        {receipt.offline
-                          ? "Backend unreachable — receipt generated locally."
-                          : "Payment confirmed by the campus backend."}
-                      </span>
-                    </div>
-                  </div>
-
-                  <dl className="grid gap-3 rounded-2xl bg-secondary p-4 sm:grid-cols-2">
-                    <Row k="Application ID" v={receipt.applicationId} />
-                    <Row k="Payment reference" v={receipt.reference} />
-                    <Row k="Applicant" v={form.name || "—"} />
-                    <Row k="Programme" v={form.program} />
-                    <Row k="Amount paid" v={inr(receipt.amount ?? fee)} />
-                    <Row k="Status" v="Pending review" />
-                  </dl>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() =>
-                        downloadCsv(
-                          "admission-receipt",
-                          [
-                            { key: "field", header: "Field" },
-                            { key: "value", header: "Value" },
-                          ],
-                          [
-                            { field: "Application ID", value: receipt.applicationId },
-                            { field: "Reference", value: receipt.reference },
-                            { field: "Applicant", value: form.name },
-                            { field: "Programme", value: form.program },
-                            { field: "Amount", value: receipt.amount ?? fee },
-                          ],
-                        )
-                      }
-                    >
-                      <Download />
-                      Download receipt
-                    </Button>
-                    <Button asChild size="lg">
-                      <Link to="/">
-                        Back to sign in
-                        <ArrowRight />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
               ) : null}
             </motion.div>
           </AnimatePresence>
@@ -290,16 +250,7 @@ function Field({ label, id, children }) {
   )
 }
 
-function Row({ k, v }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs tracking-wide text-muted-foreground uppercase">{k}</dt>
-      <dd className="text-sm font-medium">{v}</dd>
-    </div>
-  )
-}
-
-function Nav({ onBack, onNext }) {
+function Nav({ onBack, onNext, nextDisabled }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {onBack ? (
@@ -308,7 +259,7 @@ function Nav({ onBack, onNext }) {
           Back
         </Button>
       ) : null}
-      <Button size="lg" onClick={onNext}>
+      <Button size="lg" onClick={onNext} disabled={nextDisabled}>
         Continue
         <ArrowRight />
       </Button>

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom"
 import Login from "@/pages/login"
 import Apply from "@/pages/apply"
+import ApplicantPortal from "@/pages/applicant-portal"
 import AdminLayout from "@/pages/admin/layout"
 import AdminDashboard from "@/pages/admin/dashboard"
 import Admissions from "@/pages/admin/admissions"
@@ -18,6 +19,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/apply" element={<Apply />} />
+      <Route path="/applicant" element={<ApplicantPortal />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="admissions" element={<Admissions />} />

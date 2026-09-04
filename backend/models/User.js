@@ -6,8 +6,8 @@ const UserSchema = schema({
   email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   name: { type: String, required: true },
-  role: { type: String, enum: ["admin", "faculty", "student"], required: true, index: true },
-  /** Links to Faculty.id or Student.id; empty for admins. */
+  role: { type: String, enum: ["admin", "faculty", "student", "applicant"], required: true, index: true },
+  /** Links to Faculty.id, Student.id or Admission.id; empty for admins. */
   linkedId: { type: String, default: "" },
 });
 

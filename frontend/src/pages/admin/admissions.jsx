@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Check, X } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/primitives"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AsyncBoundary, CardsSkeleton } from "@/components/async-boundary"
+import { AsyncBoundary, CardsSkeleton, ErrorState } from "@/components/async-boundary"
 import { useApiAll } from "@/lib/use-api"
 import { decideAdmission, getAdmissionFees, getAdmissions } from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
@@ -22,15 +22,26 @@ export default function Admissions() {
   const admissionFees = data.fees
   const [busy, setBusy] = useState(null)
 
+  // Applicants pay from their own portal; poll so the tracker stays current.
+  useEffect(() => {
+    const timer = setInterval(refresh, 5000)
+    return () => clearInterval(timer)
+  }, [refresh])
+
   /** Writes the decision, then swaps in the row the server returned. */
+  const [decisionError, setDecisionError] = useState(null)
+
   const decide = async (id, status) => {
     setBusy(id)
+    setDecisionError(null)
     try {
       const updated = await decideAdmission(id, status)
       setData((d) => ({
         ...d,
         requests: d.requests.map((r) => (r.id === id ? updated : r)),
       }))
+    } catch (err) {
+      setDecisionError(err)
     } finally {
       setBusy(null)
     }
@@ -56,6 +67,19 @@ export default function Admissions() {
     { key: "fee", header: "Fee payable", align: "right", render: (r) => inr(r.fee) },
   ]
 
+  /** Whether the approved applicant has actually paid and taken the seat. */
+  const seatColumns = [
+    {
+      key: "feeStatus",
+      header: "Seat fee",
+      render: (r) => (
+        <Badge tone={r.feeStatus === "Paid" ? "green" : "red"}>{r.feeStatus}</Badge>
+      ),
+    },
+    { key: "studentId", header: "Student ID", render: (r) => r.studentId || "—" },
+    { key: "paymentRef", header: "Reference", render: (r) => r.paymentRef || "—" },
+  ]
+
   return (
     <>
       <PageHeader
@@ -76,6 +100,8 @@ export default function Admissions() {
           <StatCard label="Fees collected" value={inr(admissionFees.reduce((s, f) => s + f.paid, 0))} hint="admission head" tone="blue" />
         </div>
       </AsyncBoundary>
+
+      {decisionError ? <ErrorState error={decisionError} /> : null}
 
       <Tabs defaultValue="requests">
         <TabsList>
@@ -122,7 +148,11 @@ export default function Admissions() {
             name="approved-admissions"
             rows={approved}
             searchPlaceholder="Search approved admissions…"
-            columns={[...base, { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> }]}
+            columns={[
+              ...base,
+              { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
+              ...seatColumns,
+            ]}
           />
         </TabsContent>
 

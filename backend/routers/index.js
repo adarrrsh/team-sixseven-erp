@@ -4,6 +4,7 @@ const router = express.Router();
 
 router.use("/auth", require("./auth"));
 router.use("/admissions", require("./admissions"));
+router.use("/applicants", require("./applicants"));
 router.use("/faculty", require("./faculty"));
 router.use("/students", require("./students"));
 router.use("/courses", require("./courses"));

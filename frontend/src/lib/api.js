@@ -37,6 +37,19 @@ const del = (path) => request("DELETE", path)
 export const login = (email, password, role) =>
   post("/api/auth/login", { email, password, role })
 
+/* ---------------------------------------------------------- applicants --- */
+
+/** Submits the admission form and opens the applicant's tracking login. */
+export const registerApplicant = (payload) => post("/api/applicants/register", payload)
+
+/** The applicant portal's single source of truth: stage, application, credentials. */
+export const getApplicantStatus = (email) => get("/api/applicants/me", { email })
+
+export const getProgrammeFees = () => get("/api/applicants/fees")
+
+/** Seat fee for an approved application. Returns the issued student login. */
+export const payAdmissionFee = (payload) => post("/api/payments/admission", payload)
+
 /* ---------------------------------------------------------- admissions --- */
 
 export const getAdmissions = (params) => get("/api/admissions", params)
@@ -128,14 +141,6 @@ export const getDepartments = () => get("/api/dashboard/departments")
 export const getOrgGraph = () => get("/api/dashboard/org-graph")
 
 /* ------------------------------------------------------------ payments --- */
-
-/**
- * Dummy payment gateway. Talks to the Express backend when it is running and
- * falls back to a locally-generated receipt so the flow is always demoable.
- */
-export async function payApplicationFee(payload) {
-  return pay("/api/payments/admission", payload)
-}
 
 /** Semester fees and fines from the student portal. */
 export async function payStudentDue(payload) {

@@ -36,12 +36,23 @@ const admissionRequests = [
   { id: "AD-2048", name: "Sara Fernandes", program: "B.Tech CSE", score: 89, applied: "2026-08-23", fee: 78000, status: "Pending", email: "sara.f@mail.com", phone: "98200 21988" },
 ];
 
+/** Fee state for the seeded applications, matching the tracker rows below. */
+const ADMISSION_FEE_STATE = {
+  "AD-2044": { feeStatus: "Paid", paymentRef: "PAY-9F31A", paidAt: "2026-08-21" },
+};
+
 const admissionFees = [
   { id: "AD-2044", name: "Zoya Khan", program: "B.Tech CSE", payable: 78000, paid: 78000, mode: "UPI", ref: "PAY-9F31A", status: "Paid" },
   { id: "AD-2046", name: "Meera Iyer", program: "B.Tech ECE", payable: 74000, paid: 30000, mode: "Card", ref: "PAY-71C0B", status: "Partial" },
   { id: "AD-2041", name: "Ishaan Verma", program: "B.Tech CSE", payable: 78000, paid: 0, mode: "—", ref: "—", status: "Unpaid" },
   { id: "AD-2042", name: "Nandini Rao", program: "B.Tech ECE", payable: 74000, paid: 5000, mode: "UPI", ref: "PAY-2AB84", status: "Partial" },
 ];
+
+const admissions = admissionRequests.map((a) => ({
+  ...a,
+  feeStatus: "Unpaid",
+  ...(ADMISSION_FEE_STATE[a.id] ?? {}),
+}));
 
 const teacherAvailability = {
   "Dr. Aparna Joshi": ["Mon P3", "Tue P2", "Thu P1"],
@@ -190,6 +201,16 @@ const metrics = [
 /** Demo logins matching the hints on the sign-in form. */
 const users = [
   { email: "registrar@origin.edu", password: "origin-demo", name: "Registrar", role: "admin", linkedId: "" },
+  // Applicants track their own request; these are still under review.
+  ...admissionRequests
+    .filter((a) => a.status === "Pending")
+    .map((a) => ({
+      email: a.email,
+      password: "origin-demo",
+      name: a.name,
+      role: "applicant",
+      linkedId: a.id,
+    })),
   ...faculty.map((f) => ({ email: f.email, password: "origin-demo", name: f.name, role: "faculty", linkedId: f.id })),
   ...students.map((s) => ({ email: s.email, password: "origin-demo", name: s.name, role: "student", linkedId: s.id })),
 ];
@@ -209,7 +230,7 @@ async function upsert(Model, rows, keys) {
 }
 
 const COLLECTIONS = [
-  [Admission, admissionRequests, ["id"]],
+  [Admission, admissions, ["id"]],
   [AdmissionFee, admissionFees, ["id"]],
   [Faculty, faculty, ["id"]],
   [Leave, leaveRequests, ["id"]],
