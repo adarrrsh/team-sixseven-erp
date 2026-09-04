@@ -112,7 +112,7 @@ export default function Admissions() {
             <CardDescription>Pending, approved and rejected, out of {rows.length} applications</CardDescription>
           </CardHeader>
           <CardContent>
-            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
               <DonutChart
                 data={[
                   { label: "Pending", value: pending.length, tone: "pink" },
@@ -121,6 +121,9 @@ export default function Admissions() {
                 ]}
                 centerValue={rows.length}
                 centerLabel="total"
+                size={240}
+                thickness={30}
+                className="justify-center"
               />
             </AsyncBoundary>
           </CardContent>

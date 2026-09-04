@@ -91,7 +91,14 @@ export default function Examinations() {
             <CardDescription>Draft, scheduled, completed and cancelled</CardDescription>
           </CardHeader>
           <CardContent>
-            <DonutChart data={byStatus} centerValue={exams.length} centerLabel="exams" />
+            <DonutChart
+              data={byStatus}
+              centerValue={exams.length}
+              centerLabel="exams"
+              size={240}
+              thickness={30}
+              className="justify-center"
+            />
           </CardContent>
         </Card>
       ) : null}

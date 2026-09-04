@@ -133,7 +133,14 @@ export default function FacultyManagement() {
                 <CardDescription>Headcount across the institute</CardDescription>
               </CardHeader>
               <CardContent>
-                <DonutChart data={byDept} centerValue={faculty.length} centerLabel="teachers" />
+                <DonutChart
+                  data={byDept}
+                  centerValue={faculty.length}
+                  centerLabel="teachers"
+                  size={240}
+                  thickness={30}
+                  className="justify-center"
+                />
               </CardContent>
             </Card>
           ) : null}
@@ -204,8 +211,8 @@ export default function FacultyManagement() {
               <CardDescription>Institute-wide monthly average</CardDescription>
             </CardHeader>
             <CardContent>
-              <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-                <LineChart data={attendanceTrend} tone="pink" />
+              <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
+                <LineChart data={attendanceTrend} tone="pink" height={260} />
               </AsyncBoundary>
             </CardContent>
           </Card>

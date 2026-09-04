@@ -129,7 +129,14 @@ export default function StudentManagement() {
                 <CardDescription>Active, probation, alumni and inactive, on roll</CardDescription>
               </CardHeader>
               <CardContent>
-                <DonutChart data={byStatus} centerValue={students.length} centerLabel="students" />
+                <DonutChart
+                  data={byStatus}
+                  centerValue={students.length}
+                  centerLabel="students"
+                  size={240}
+                  thickness={30}
+                  className="justify-center"
+                />
               </CardContent>
             </Card>
           ) : null}
