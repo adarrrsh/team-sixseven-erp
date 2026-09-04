@@ -3,11 +3,10 @@ import { Check, Plus, X } from "lucide-react"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { DonutChart, LineChart } from "@/components/charts"
+import { DonutChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/primitives"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
@@ -24,6 +23,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { AttendanceRegister } from "@/components/attendance-register"
+import { AttendanceTracker } from "@/components/attendance-tracker"
+import { CardRegistry } from "@/components/card-registry"
 import { useApi, useApiAll } from "@/lib/use-api"
 import {
   assignInvigilator,
@@ -54,7 +56,6 @@ export default function FacultyManagement() {
   )
 
   const { faculty, leave, duties, salaries } = data
-  const attendanceTrend = data.attendance?.trend ?? []
   const avgAttendance = faculty.length
     ? Math.round(faculty.reduce((s, f) => s + f.attendance, 0) / faculty.length)
     : 0
@@ -120,9 +121,11 @@ export default function FacultyManagement() {
             <Badge tone="pink">{leave.filter((l) => l.status === "Pending").length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="register">Day register</TabsTrigger>
           <TabsTrigger value="salary">Salary</TabsTrigger>
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="duty">Invigilator duty</TabsTrigger>
+          <TabsTrigger value="cards">RFID cards</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory" className="flex flex-col gap-4">
@@ -204,41 +207,22 @@ export default function FacultyManagement() {
           />
         </TabsContent>
 
-        <TabsContent value="attendance" className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance trend</CardTitle>
-              <CardDescription>Institute-wide monthly average</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-64 w-full" />}>
-                <LineChart data={attendanceTrend} tone="pink" height={260} />
-              </AsyncBoundary>
-            </CardContent>
-          </Card>
-          <DataTable
-            name="faculty-attendance"
-            rows={faculty}
-            empty={loading ? "Loading…" : "No attendance recorded."}
-            searchPlaceholder="Search by teacher…"
-            columns={[
-              { key: "id", header: "Staff ID" },
-              { key: "name", header: "Name" },
-              { key: "dept", header: "Department" },
-              { key: "attendance", header: "Present %", align: "right" },
-              {
-                key: "bar",
-                header: "Rolling 30 days",
-                export: false,
-                render: (r) => (
-                  <div className="w-48">
-                    <Progress value={r.attendance} tone={r.attendance >= 90 ? "green" : r.attendance >= 80 ? "pink" : "red"} />
-                  </div>
-                ),
-              },
-              { key: "load", header: "Load (h/wk)", align: "right" },
-            ]}
-          />
+        <TabsContent value="attendance">
+          <Section
+            title="Attendance tracker"
+            description="Staff turnout over time, with each teacher's day-by-day record."
+          >
+            <AttendanceTracker holderType="faculty" />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="register">
+          <Section
+            title="Day register"
+            description="Staff taps at the gate readers, with manual correction where a card failed."
+          >
+            <AttendanceRegister holderType="faculty" />
+          </Section>
         </TabsContent>
 
         <TabsContent value="salary">
@@ -306,6 +290,14 @@ export default function FacultyManagement() {
               },
             ]}
           />
+        </TabsContent>
+        <TabsContent value="cards">
+          <Section
+            title="RFID cards"
+            description="Cards issued to teaching staff. Only an active card marks attendance."
+          >
+            <CardRegistry holderType="faculty" />
+          </Section>
         </TabsContent>
       </Tabs>
     </>

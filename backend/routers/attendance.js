@@ -152,6 +152,137 @@ router.get(
 );
 
 /**
+ * GET /api/attendance/summary?holderType= — one row per person: days present,
+ * days absent and the percentage those work out to. Backs the tracker table.
+ */
+router.get(
+  "/summary",
+  route(async (req, res) => {
+    const holderType = req.query.holderType ?? "student";
+    const rows = await Attendance.aggregate([
+      { $match: { holderType } },
+      {
+        $group: {
+          _id: "$holderId",
+          name: { $first: "$name" },
+          dept: { $first: "$dept" },
+          days: { $sum: 1 },
+          present: { $sum: { $cond: [{ $eq: ["$status", "Present"] }, 1, 0] } },
+          lastSeen: { $max: "$lastSeen" },
+        },
+      },
+      { $sort: { name: 1 } },
+    ]);
+
+    res.json(
+      rows.map((r) => ({
+        holderId: r._id,
+        name: r.name,
+        dept: r.dept,
+        days: r.days,
+        present: r.present,
+        absent: r.days - r.present,
+        percentage: r.days ? Math.round((r.present / r.days) * 100) : 0,
+        lastSeen: r.lastSeen || "",
+      })),
+    );
+  }),
+);
+
+/**
+ * GET /api/attendance/trend?holderType=&days=  — cohort turnout per day, as a
+ * percentage, oldest first. Shaped for the chart components.
+ */
+router.get(
+  "/trend",
+  route(async (req, res) => {
+    const holderType = req.query.holderType ?? "student";
+    const limit = Math.min(Math.max(Number(req.query.days) || 14, 1), 90);
+
+    const rows = await Attendance.aggregate([
+      { $match: { holderType } },
+      {
+        $group: {
+          _id: "$date",
+          total: { $sum: 1 },
+          present: { $sum: { $cond: [{ $eq: ["$status", "Present"] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: -1 } },
+      { $limit: limit },
+    ]);
+
+    res.json(
+      rows
+        .reverse()
+        .map((r) => ({
+          date: r._id,
+          // "05 Sep" reads better on an axis than the full date.
+          label: new Date(r._id + "T00:00:00").toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+          }),
+          value: r.total ? Math.round((r.present / r.total) * 100) : 0,
+          present: r.present,
+          total: r.total,
+        })),
+    );
+  }),
+);
+
+/**
+ * GET /api/attendance/history/:holderId?holderType=&days=
+ * One person's register with the figures a profile page shows: totals, the
+ * percentage, their current run of present days, and the day-by-day record.
+ */
+router.get(
+  "/history/:holderId",
+  route(async (req, res) => {
+    const holderType = req.query.holderType ?? "student";
+    const holder = await modelFor(holderType).findOne({ id: req.params.holderId });
+    if (!holder) throw new HttpError(404, "Holder not found");
+
+    const records = await Attendance.find({
+      holderType,
+      holderId: req.params.holderId,
+    }).sort({ date: -1 });
+
+    const present = records.filter((r) => r.status === "Present").length;
+    const days = records.length;
+
+    // Consecutive present days counting back from the most recent record.
+    let streak = 0;
+    for (const record of records) {
+      if (record.status !== "Present") break;
+      streak += 1;
+    }
+
+    res.json({
+      holder: { id: holder.id, name: holder.name, dept: holder.dept, program: holder.program },
+      days,
+      present,
+      absent: days - present,
+      percentage: days ? Math.round((present / days) * 100) : 0,
+      streak,
+      /** The institute needs 75% to sit exams. */
+      eligible: days ? Math.round((present / days) * 100) >= 75 : true,
+      trend: records
+        .slice(0, 30)
+        .reverse()
+        .map((r) => ({
+          date: r.date,
+          label: new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+          }),
+          value: r.status === "Present" ? 100 : 0,
+        })),
+      records,
+    });
+  }),
+);
+
+/**
  * POST /api/attendance/close-day — end-of-day roll.
  *
  * Everyone who never tapped in is marked Absent for that date, which is what

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
 import { Route, Routes, useNavigate } from "react-router-dom"
-import { BookOpen, CalendarDays, ClipboardList, LayoutDashboard, Network as NetworkIcon, Trophy, Wallet } from "lucide-react"
+import { BookOpen, CalendarCheck, CalendarDays, ClipboardList, LayoutDashboard, Network as NetworkIcon, Trophy, Wallet } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart, DonutChart, LineChart } from "@/components/charts"
+import { BarChart, DonutChart, LineChart, RadialGauge } from "@/components/charts"
 import { KnowledgeGraph } from "@/components/knowledge-graph"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { AsyncBoundary, CardsSkeleton, ErrorState, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
-import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
+import { getAttendanceHistory, getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
 import { loadSession } from "@/lib/session"
 import { inr, pct } from "@/lib/utils"
 
@@ -47,6 +47,7 @@ const NAV = [
   { to: "/student", label: "Overview", icon: LayoutDashboard, end: true },
   { heading: "Academics" },
   { to: "/student/timetable", label: "Timetable", icon: CalendarDays },
+  { to: "/student/attendance", label: "Attendance", icon: CalendarCheck },
   { to: "/student/courses", label: "Courses", icon: BookOpen },
   { to: "/student/exams", label: "Exams", icon: ClipboardList },
   { to: "/student/score", label: "Score", icon: Trophy },
@@ -72,6 +73,7 @@ export default function StudentPortal() {
       <Routes>
         <Route index element={<Overview />} />
         <Route path="timetable" element={<MyTimetable />} />
+        <Route path="attendance" element={<MyAttendance />} />
         <Route path="courses" element={<MyCourses />} />
         <Route path="exams" element={<MyExams />} />
         <Route path="score" element={<MyScore />} />
@@ -545,5 +547,122 @@ function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant =
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+
+/**
+ * The student's own attendance tracker.
+ *
+ * Reads the same register the gate readers write to, so what shows here is
+ * exactly what their card recorded — including whether they clear the 75%
+ * threshold needed to sit exams.
+ */
+function MyAttendance() {
+  const session = loadSession()
+  const { data, error, loading, refresh } = useApi(
+    () => getAttendanceHistory(session?.linkedId),
+    [session?.linkedId],
+    null,
+  )
+
+  const percentage = data?.percentage ?? 0
+  const tone = percentage >= 85 ? "green" : percentage >= 75 ? "pink" : "red"
+
+  // Consecutive days they would need to attend to climb back over 75%.
+  const shortfall = data
+    ? Math.max(0, Math.ceil((0.75 * data.days - data.present) / 0.25))
+    : 0
+
+  return (
+    <>
+      <PageHeader
+        title="Attendance"
+        description="Recorded when you tap in at the gate. 75% is needed to sit exams."
+      />
+
+      <AsyncBoundary
+        loading={loading}
+        error={error}
+        onRetry={refresh}
+        skeleton={<CardsSkeleton count={4} />}
+      >
+        {data ? (
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Attendance" value={`${percentage}%`} hint={`${data.days} days recorded`} tone={tone} />
+              <StatCard label="Days present" value={data.present} hint="tapped in" tone="green" />
+              <StatCard label="Days absent" value={data.absent} hint="no record that day" tone={data.absent ? "red" : "green"} />
+              <StatCard label="Current streak" value={`${data.streak}d`} hint="consecutive days present" tone="blue" />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Exam eligibility</CardTitle>
+                  <CardDescription>
+                    {data.eligible ? "You are clear to sit exams" : "Below the 75% threshold"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-3">
+                  <RadialGauge value={percentage} tone={tone} label="attended" />
+                  {data.eligible ? (
+                    <Badge tone="green">Eligible</Badge>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge tone="red">At risk</Badge>
+                      <span className="text-center text-xs text-muted-foreground">
+                        Attend the next {shortfall} session{shortfall === 1 ? "" : "s"} to clear 75%.
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="xl:col-span-2">
+                <CardHeader>
+                  <CardTitle>Recent days</CardTitle>
+                  <CardDescription>Each bar is one day — full means present</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <BarChart data={data.trend} tone={tone} suffix="" />
+                </CardContent>
+              </Card>
+            </div>
+
+            <Section title="Day-by-day" description="Your full attendance record">
+              <DataTable
+                name="my-attendance"
+                rows={data.records}
+                empty="Nothing recorded yet."
+                searchPlaceholder="Search by date…"
+                columns={[
+                  { key: "date", header: "Date" },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (r) => (
+                      <Badge tone={r.status === "Present" ? "green" : "red"}>{r.status}</Badge>
+                    ),
+                  },
+                  {
+                    key: "firstSeen",
+                    header: "Tapped in",
+                    render: (r) =>
+                      r.firstSeen
+                        ? new Date(r.firstSeen).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—",
+                  },
+                  { key: "reader", header: "Gate", render: (r) => r.reader || "—" },
+                ]}
+              />
+            </Section>
+          </div>
+        ) : null}
+      </AsyncBoundary>
+    </>
   )
 }

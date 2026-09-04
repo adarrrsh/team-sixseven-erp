@@ -24,6 +24,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
+import { AttendanceRegister } from "@/components/attendance-register"
+import { AttendanceTracker } from "@/components/attendance-tracker"
+import { CardRegistry } from "@/components/card-registry"
 import { useApi, useApiAll } from "@/lib/use-api"
 import {
   createStudent,
@@ -110,6 +113,7 @@ export default function StudentManagement() {
         <TabsList>
           <TabsTrigger value="directory">Directory</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="register">Day register</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
           <TabsTrigger value="fines">
             Fines
@@ -119,6 +123,7 @@ export default function StudentManagement() {
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="exams">Exams</TabsTrigger>
           <TabsTrigger value="score">Score</TabsTrigger>
+          <TabsTrigger value="cards">RFID cards</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory" className="flex flex-col gap-4">
@@ -161,33 +166,30 @@ export default function StudentManagement() {
         </TabsContent>
 
         <TabsContent value="attendance">
-          <DataTable
-            name="student-attendance"
-            empty={loading ? "Loading…" : "No attendance recorded."}
-            rows={students}
-            searchPlaceholder="Search by student…"
-            columns={[
-              { key: "id", header: "Student ID" },
-              { key: "name", header: "Name" },
-              { key: "program", header: "Programme" },
-              { key: "attendance", header: "Present %", align: "right" },
-              {
-                key: "bar",
-                header: "This semester",
-                export: false,
-                render: (r) => (
-                  <div className="w-48">
-                    <Progress value={r.attendance} tone={r.attendance >= 85 ? "green" : r.attendance >= 75 ? "pink" : "red"} />
-                  </div>
-                ),
-              },
-              {
-                key: "eligible",
-                header: "Exam eligible",
-                render: (r) => <StatusBadge value={r.attendance >= 75 ? "Approved" : "Rejected"} />,
-              },
-            ]}
-          />
+          <Section
+            title="Attendance tracker"
+            description="Turnout over time and every student's standing against the 75% exam rule."
+          >
+            <AttendanceTracker holderType="student" />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="register">
+          <Section
+            title="Day register"
+            description="Written by the RFID readers at the gates; correct a row by hand if a card failed."
+          >
+            <AttendanceRegister holderType="student" />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="cards">
+          <Section
+            title="RFID cards"
+            description="Cards issued to students. Only an active card marks attendance."
+          >
+            <CardRegistry holderType="student" />
+          </Section>
         </TabsContent>
 
         <TabsContent value="fees">

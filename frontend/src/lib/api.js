@@ -85,13 +85,50 @@ export const getStudentStats = () => get("/api/students/stats")
 export const createStudent = (payload) => post("/api/students", payload)
 export const updateStudent = (id, payload) => patch(`/api/students/${id}`, payload)
 export const deleteStudent = (id) => del(`/api/students/${id}`)
-export const markAttendance = (id, attendance) =>
-  patch(`/api/students/${id}/attendance`, { attendance })
 
 export const getStudentFees = (params) => get("/api/students/fees", params)
 export const getFines = (params) => get("/api/students/fines", params)
 export const raiseFine = (payload) => post("/api/students/fines", payload)
 export const settleFine = (id) => patch(`/api/students/fines/${id}/settle`)
+
+/* ---------------------------------------------------------- attendance --- */
+
+/** The day register. Filter by date, holder, or status. */
+export const getAttendance = (params) => get("/api/attendance", params)
+
+/** Everyone seen so far today, with present/absent totals. */
+export const getAttendanceToday = () => get("/api/attendance/today")
+
+/**
+ * Marks one person present or absent for a date, by hand. RFID scans write the
+ * same records, so a correction here and a card tap are the same register.
+ */
+export const setAttendance = (holderId, { date, status, holderType = "student" }) =>
+  patch(`/api/attendance/${holderId}`, { date, status, holderType })
+
+/** One row per person: days present, absent, and the resulting percentage. */
+export const getAttendanceSummary = (holderType = "student") =>
+  get("/api/attendance/summary", { holderType })
+
+/** Cohort turnout per day, oldest first, shaped for the chart components. */
+export const getAttendanceTrend = (holderType = "student", days = 14) =>
+  get("/api/attendance/trend", { holderType, days })
+
+/** One person's register plus totals, streak and exam eligibility. */
+export const getAttendanceHistory = (holderId, holderType = "student") =>
+  get(`/api/attendance/history/${holderId}`, { holderType })
+
+/** End-of-day roll: everyone who never tapped in is marked absent. */
+export const closeAttendanceDay = (date, holderType = "student") =>
+  post("/api/attendance/close-day", { date, holderType })
+
+/* --------------------------------------------------------- rfid cards --- */
+
+export const getCards = (params) => get("/api/cards", params)
+export const issueCard = (payload) => post("/api/cards", payload)
+export const setCardStatus = (cardId, status) =>
+  patch(`/api/cards/${encodeURIComponent(cardId)}`, { status })
+export const revokeCard = (cardId) => del(`/api/cards/${encodeURIComponent(cardId)}`)
 
 /* ------------------------------------------------------------- courses --- */
 
