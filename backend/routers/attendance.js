@@ -5,7 +5,7 @@ const Student = require("../models/Student");
 const Faculty = require("../models/Faculty");
 const { normaliseUid } = require("../lib/uid");
 const { route, badRequest, HttpError, contains } = require("../lib/http");
-const { syncPercentage, toDate, modelFor } = require("../lib/attendance");
+const { syncPercentage, reconcileAll, toDate, modelFor } = require("../lib/attendance");
 
 const router = express.Router();
 
@@ -328,6 +328,18 @@ router.post(
       markedAbsent: missing.length,
       present: people.length - missing.length,
     });
+  }),
+);
+
+/**
+ * POST /api/attendance/reconcile — realign every stored percentage with the
+ * register. Returns only the rows that actually moved.
+ */
+router.post(
+  "/reconcile",
+  route(async (req, res) => {
+    const changed = await reconcileAll(req.body?.holderType);
+    res.json({ ok: true, reconciled: changed.length, changed });
   }),
 );
 

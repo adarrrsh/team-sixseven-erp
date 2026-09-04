@@ -8,31 +8,12 @@ const StudentFee = require("../models/StudentFee");
 const Fine = require("../models/Fine");
 const User = require("../models/User");
 const { route, badRequest, HttpError, nextId } = require("../lib/http");
-const { generatePassword } = require("../lib/credentials");
+const { enrolFromAdmission } = require("../lib/enrolment");
 
 const router = express.Router();
 
 const reference = () =>
   "PAY-" + crypto.randomBytes(4).toString("hex").slice(0, 5).toUpperCase();
-
-/** Programmes map onto the department the admitted student joins. */
-const PROGRAM_DEPT = {
-  "B.Tech CSE": "Computer Science",
-  "B.Tech ECE": "Electronics",
-  "B.Tech MECH": "Mechanical",
-  "B.Com Hons": "Commerce",
-};
-
-/** An institute address in the house style — "aisha.s@origin.edu" — kept unique. */
-async function instituteEmail(name) {
-  const [first = "student", last = ""] = String(name).toLowerCase().split(/\s+/);
-  const base = last ? `${first}.${last[0]}` : first;
-
-  for (let n = 0; ; n += 1) {
-    const candidate = `${base}${n || ""}@origin.edu`;
-    if (!(await User.findOne({ email: candidate }))) return candidate;
-  }
-}
 
 /**
  * POST /api/payments/admission — the seat fee for an approved application.
@@ -85,29 +66,7 @@ router.post(
     const paidAt = new Date().toISOString();
 
     // Enrol the student and issue their credentials.
-    const studentId = await nextId(Student, "ST-", 8801);
-    const password = generatePassword();
-    const studentEmail = await instituteEmail(admission.name);
-
-    await Student.create({
-      id: studentId,
-      name: admission.name,
-      program: admission.program,
-      sem: 1,
-      dept: PROGRAM_DEPT[admission.program] ?? "Computer Science",
-      email: studentEmail,
-      phone: admission.phone,
-      guardian: "—",
-      status: "Active",
-    });
-
-    await User.create({
-      email: studentEmail,
-      password,
-      name: admission.name,
-      role: "student",
-      linkedId: studentId,
-    });
+    const { studentId, email: studentEmail, password } = await enrolFromAdmission(admission);
 
     admission.feeStatus = "Paid";
     admission.paidAt = paidAt;
