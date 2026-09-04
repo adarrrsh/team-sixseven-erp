@@ -23,6 +23,11 @@ test("database consistency", async (t) => {
     assert.equal(bad.length, 0, `stored percentage has drifted from the register:${report(bad)}`);
   });
 
+  await t.test("faculty On-leave status matches an approved, in-range leave", () => {
+    const bad = of("facultyLeaveStatus");
+    assert.equal(bad.length, 0, `status disagrees with the leave record:${report(bad)}`);
+  });
+
   await t.test("student fee balances match their fee heads", () => {
     const bad = of("feesDue");
     assert.equal(bad.length, 0, `feesDue disagrees with the fee heads:${report(bad)}`);

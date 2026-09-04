@@ -8,7 +8,9 @@ const AdmissionFee = require("../models/AdmissionFee");
 const Score = require("../models/Score");
 const Card = require("../models/Card");
 const User = require("../models/User");
+const Leave = require("../models/Leave");
 const { grade } = require("./grade");
+const { toDate } = require("./attendance");
 
 /**
  * Checks every denormalised field against the records it is derived from.
@@ -23,7 +25,7 @@ async function checkConsistency() {
   const issues = [];
   const flag = (kind, detail) => issues.push({ kind, detail });
 
-  const [students, faculty, attendance, fees, fines, admissions, admFees, scores, cards, users] =
+  const [students, faculty, attendance, fees, fines, admissions, admFees, scores, cards, users, leaves] =
     await Promise.all([
       Student.find().lean(),
       Faculty.find().lean(),
@@ -35,6 +37,7 @@ async function checkConsistency() {
       Score.find().lean(),
       Card.find().lean(),
       User.find().lean(),
+      Leave.find().lean(),
     ]);
 
   const fromRegister = (holderType, id) => {
@@ -54,6 +57,30 @@ async function checkConsistency() {
           `${person.id} ${person.name}: stored ${person.attendance}% vs register ${derived.percentage}% (${derived.present}/${derived.days})`,
         );
       }
+    }
+  }
+
+  /**
+   * A faculty's `status` field is a denormalized cache `PATCH
+   * /faculty/leaves/:id/status` writes at the moment a decision is made —
+   * it can drift from the Leave collection it's meant to summarise (a leave
+   * still Pending left `status` at a stale "On leave" from an old record;
+   * an approved leave's date range ended and nothing ever flipped `status`
+   * back). The timetable no longer trusts this field for restaffing, but a
+   * drifted value here still shows up as a wrong badge in the faculty
+   * directory, so it's still worth catching directly.
+   */
+  const today = toDate();
+  const onLeaveNow = new Set(
+    leaves.filter((l) => l.status === "Approved" && l.from <= today && l.to >= today).map((l) => l.name),
+  );
+  for (const f of faculty) {
+    const shouldBeOnLeave = onLeaveNow.has(f.name);
+    if (f.status === "On leave" && !shouldBeOnLeave) {
+      flag("facultyLeaveStatus", `${f.id} ${f.name}: marked On leave but has no approved leave covering today`);
+    }
+    if (f.status !== "On leave" && shouldBeOnLeave) {
+      flag("facultyLeaveStatus", `${f.id} ${f.name}: has an approved leave covering today but status is ${f.status}`);
     }
   }
 

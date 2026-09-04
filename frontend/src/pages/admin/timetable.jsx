@@ -15,6 +15,12 @@ import { cn } from "cn"
 export default function AdminTimetable() {
   const [unavailable, setUnavailable] = useState([])
   const [rebuilding, setRebuilding] = useState(false)
+  // Single-select — a distinct concern from `unavailable` above (which marks
+  // several teachers off for the rebuild). Picking a teacher here just
+  // filters the Teacher view tab down to their own schedule; picking
+  // another replaces the selection rather than adding to it.
+  const [viewing, setViewing] = useState(null)
+  const [tab, setTab] = useState("student")
 
   /**
    * The backend re-staffs the grid: it folds anyone on approved leave into the
@@ -98,7 +104,44 @@ export default function AdminTimetable() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="student">
+      <Card>
+        <CardHeader>
+          <CardTitle>View one teacher's timetable</CardTitle>
+          <CardDescription>
+            Pick a teacher to see just their schedule in the Teacher view tab below — pick another to switch.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setViewing(null)}
+            className={cn(
+              "rounded-2xl border px-3 py-2 text-sm font-medium transition-colors",
+              !viewing ? "border-pink-strong bg-pink-strong text-white" : "border-border hover:bg-secondary",
+            )}
+          >
+            All teachers
+          </button>
+          {faculty.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => {
+                setViewing(f.name)
+                setTab("teacher")
+              }}
+              className={cn(
+                "rounded-2xl border px-3 py-2 text-sm font-medium transition-colors",
+                viewing === f.name ? "border-pink-strong bg-pink-strong text-white" : "border-border hover:bg-secondary",
+              )}
+            >
+              {f.name}
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="student">Student view</TabsTrigger>
           <TabsTrigger value="teacher">Teacher view</TabsTrigger>
@@ -119,9 +162,12 @@ export default function AdminTimetable() {
         </TabsContent>
 
         <TabsContent value="teacher">
-          <Section title="Staffing" description="Who stands in front of the class">
+          <Section
+            title={viewing ? `${viewing}'s timetable` : "Staffing"}
+            description={viewing ? "Their slots only — pick another teacher above, or \"All teachers\" to see everyone." : "Who stands in front of the class"}
+          >
             <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-72 w-full" />}>
-              <TimetableGrid data={grid} show="faculty" />
+              <TimetableGrid data={grid} show="faculty" highlight={viewing ?? undefined} />
             </AsyncBoundary>
           </Section>
         </TabsContent>

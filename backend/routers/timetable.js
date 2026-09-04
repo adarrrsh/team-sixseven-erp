@@ -1,9 +1,39 @@
 const express = require("express");
 const TimetableSlot = require("../models/TimetableSlot");
 const Faculty = require("../models/Faculty");
+const Leave = require("../models/Leave");
+const { toDate } = require("../lib/attendance");
 const { route, badRequest } = require("../lib/http");
 
 const router = express.Router();
+
+/**
+ * Who's actually unavailable today, straight from the Leave collection's own
+ * approved, in-range requests — not `Faculty.status`. That field is only a
+ * denormalized cache `PATCH /faculty/leaves/:id/status` writes at the moment
+ * a decision is made; it drifts from the truth in both directions (a leave
+ * still Pending can leave `status` at a stale "On leave" from an old record,
+ * and nothing ever flips it back once an approved leave's date range ends).
+ * Restaffing around a teacher who was never actually approved off — or who
+ * came back weeks ago — is exactly the kind of false-data conflict this
+ * avoids by checking the real source every time instead of a cached flag.
+ *
+ * `toDate()` (not `toISOString().slice(0, 10)`) — the latter normalises to
+ * UTC, a different calendar day from local time for a good chunk of the
+ * clock (e.g. any time before 5:30am IST), while `Leave.from`/`to` are plain
+ * "YYYY-MM-DD" strings meant in local time like every other date in this
+ * app. It's the same local-day helper `lib/attendance.js` already uses and
+ * already has a test pinning its behaviour down — reusing it here instead of
+ * a second hand-rolled version is one less place this exact bug can recur.
+ */
+async function onLeaveToday() {
+  const today = toDate();
+  const rows = await Leave.find(
+    { status: "Approved", from: { $lte: today }, to: { $gte: today } },
+    { name: 1, _id: 0 },
+  ).lean();
+  return rows.map((l) => l.name);
+}
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const PERIODS = [
@@ -83,13 +113,13 @@ router.get(
     const [slots, availability, onLeave] = await Promise.all([
       TimetableSlot.find({ scope }).lean(),
       Faculty.find({}, { name: 1, free: 1, _id: 0 }).sort({ name: 1 }).lean(),
-      Faculty.find({ status: "On leave" }, { name: 1, _id: 0 }).lean(),
+      onLeaveToday(),
     ]);
 
     const requested = req.query.unavailable
       ? String(req.query.unavailable).split(",").map((s) => s.trim()).filter(Boolean)
       : [];
-    const unavailable = [...new Set([...requested, ...onLeave.map((f) => f.name)])];
+    const unavailable = [...new Set([...requested, ...onLeave])];
 
     const grid = restaff(toGrid(slots), unavailable, availability);
     const version = slots.reduce((max, s) => Math.max(max, s.version ?? 1), 1);
@@ -123,10 +153,10 @@ router.post(
     const [slots, availability, onLeave] = await Promise.all([
       TimetableSlot.find({ scope }).lean(),
       Faculty.find({}, { name: 1, free: 1, _id: 0 }).sort({ name: 1 }).lean(),
-      Faculty.find({ status: "On leave" }, { name: 1, _id: 0 }).lean(),
+      onLeaveToday(),
     ]);
 
-    const unavailable = [...new Set([...requested, ...onLeave.map((f) => f.name)])];
+    const unavailable = [...new Set([...requested, ...onLeave])];
     const grid = restaff(toGrid(slots), unavailable, availability);
     const version = slots.reduce((max, s) => Math.max(max, s.version ?? 1), 1) + 1;
 
