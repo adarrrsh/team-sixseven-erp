@@ -141,6 +141,11 @@ export const getDashboard = () => get("/api/dashboard")
 export const getDepartments = () => get("/api/dashboard/departments")
 export const getOrgGraph = () => get("/api/dashboard/org-graph")
 
+/* ------------------------------------------------------------- chatbot --- */
+
+/** { message } -> { reply, isFallback }. Server-side Gemini proxy — see backend/routers/chatbot.js. */
+export const askChatbot = (message) => post("/api/chatbot", { message })
+
 /* ------------------------------------------------------------ payments --- */
 
 /** Semester fees and fines from the student portal. */

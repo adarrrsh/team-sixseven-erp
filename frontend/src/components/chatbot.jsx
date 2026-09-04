@@ -4,6 +4,7 @@ import { MessageCircle, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { askChatbot } from "@/lib/api"
 
 const CANNED = [
   "How do I apply for admission?",
@@ -11,37 +12,39 @@ const CANNED = [
   "When does the semester start?",
 ]
 
-const REPLY = {
-  "How do I apply for admission?":
-    "Use “Apply for admission” on the sign-in card. The form takes 4 minutes and ends with the application fee payment.",
-  "What documents do I need?":
-    "Class XII marksheet, a photo ID, and one passport photograph. You can upload them after the fee is paid.",
-  "When does the semester start?":
-    "Orientation is 28 September 2026; classes begin 1 October 2026.",
-}
+const SUPPORT_FALLBACK =
+  "I couldn't help with that — please contact our support team at support@origin.edu and they'll get back to you."
 
-/** Support chatbot anchored to the lower corner of the login page. */
+/**
+ * Support chatbot anchored to the lower corner of the login page. Every
+ * message goes to the backend's Gemini proxy (`POST /api/chatbot`) — the
+ * quick-reply chips just prefill a common question, they don't shortcut the
+ * AI. Anything the backend can't answer confidently comes back as the same
+ * fixed support-contact line, whether that's the model declining or the
+ * request failing outright.
+ */
 export function Chatbot() {
   const [open, setOpen] = useState(false)
   const [log, setLog] = useState([
     { from: "bot", text: "Hi — I'm the admissions helpdesk. Ask me anything." },
   ])
   const [draft, setDraft] = useState("")
+  const [busy, setBusy] = useState(false)
 
-  const send = (text) => {
+  const send = async (text) => {
     const q = (text ?? draft).trim()
-    if (!q) return
+    if (!q || busy) return
     setDraft("")
-    setLog((l) => [
-      ...l,
-      { from: "me", text: q },
-      {
-        from: "bot",
-        text:
-          REPLY[q] ??
-          "I've noted that — an admissions officer will reply on your registered email within one working day.",
-      },
-    ])
+    setLog((l) => [...l, { from: "me", text: q }])
+    setBusy(true)
+    try {
+      const { reply } = await askChatbot(q)
+      setLog((l) => [...l, { from: "bot", text: reply || SUPPORT_FALLBACK }])
+    } catch {
+      setLog((l) => [...l, { from: "bot", text: SUPPORT_FALLBACK }])
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -75,20 +78,26 @@ export function Chatbot() {
                   key={i}
                   className={
                     m.from === "me"
-                      ? "max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground"
-                      : "max-w-[85%] self-start rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground"
+                      ? "max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm whitespace-pre-line text-primary-foreground"
+                      : "max-w-[85%] self-start rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm whitespace-pre-line text-foreground"
                   }
                 >
                   {m.text}
                 </div>
               ))}
+              {busy ? (
+                <div className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  Typing…
+                </div>
+              ) : null}
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {CANNED.map((c) => (
                   <button
                     key={c}
                     type="button"
+                    disabled={busy}
                     onClick={() => send(c)}
-                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground disabled:pointer-events-none disabled:opacity-50"
                   >
                     {c}
                   </button>
@@ -108,8 +117,9 @@ export function Chatbot() {
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Type a question…"
                 aria-label="Message"
+                disabled={busy}
               />
-              <Button type="submit" size="icon-lg" aria-label="Send">
+              <Button type="submit" size="icon-lg" aria-label="Send" disabled={busy}>
                 <Send />
               </Button>
             </form>

@@ -33,3 +33,4 @@ lerna-debug.log*
 
 *.local
 docs/todo.md
+backend/.env
