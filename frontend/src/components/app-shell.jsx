@@ -31,10 +31,12 @@ function NavItem({ to, icon: Icon, label, end, onClick, className }) {
 /**
  * Shared chrome for all three portals: one fixed, pilled navbar up top —
  * brand mark, section links, identity + sign-out — and nothing else. No
- * separate top bar, no side rail. Below `lg` the links collapse behind a
- * menu toggle (the pill itself would otherwise have to scroll sideways to
- * fit every section), opening a small dropdown under the pill. Page
- * content fades in on mount only.
+ * separate top bar, no side rail. Below `lg` the links *and* the sign-out
+ * button collapse behind a menu toggle (the pill itself would otherwise
+ * have to scroll sideways to fit every section), opening a dropdown under
+ * the pill; the bar itself stretches to fill the available width there
+ * instead of shrinking to a tight cluster around the logo. Page content
+ * fades in on mount only.
  */
 export function AppShell({ user, nav, children }) {
   const navigate = useNavigate()
@@ -55,7 +57,7 @@ export function AppShell({ user, nav, children }) {
   return (
     <div className="min-h-svh bg-background">
       <header className="fixed inset-x-0 top-4 z-50 flex flex-col items-center px-4">
-        <nav className="flex max-w-full items-center gap-1 rounded-[100px] border border-border bg-card px-2 py-2 shadow-[0_8px_24px_rgba(24,10,20,0.08)]">
+        <nav className="flex w-full max-w-full items-center gap-1 rounded-[100px] border border-border bg-card px-2 py-2 shadow-[0_8px_24px_rgba(24,10,20,0.08)] lg:w-auto">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
             <PanelsTopLeft className="size-4" />
           </span>
@@ -73,18 +75,18 @@ export function AppShell({ user, nav, children }) {
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground lg:hidden"
+            className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground lg:hidden"
           >
             {open ? <X className="size-4" /> : <Menu className="size-4" />}
           </button>
 
-          <div className="mx-1 h-5 w-px shrink-0 bg-border" />
+          <div className="mx-1 hidden h-5 w-px shrink-0 bg-border lg:block" />
 
           <button
             type="button"
             onClick={() => navigate("/")}
             title="Sign out"
-            className="flex shrink-0 items-center gap-2 rounded-[100px] py-1 pr-3 pl-1 transition-colors hover:bg-secondary"
+            className="hidden shrink-0 items-center gap-2 rounded-[100px] py-1 pr-3 pl-1 transition-colors hover:bg-secondary lg:flex"
           >
             <Avatar>
               <AvatarFallback>{initials(user.name)}</AvatarFallback>
@@ -105,6 +107,23 @@ export function AppShell({ user, nav, children }) {
               {links.map((item) => (
                 <NavItem key={item.to} {...item} onClick={() => setOpen(false)} className="w-full" />
               ))}
+
+              <div className="my-1 h-px shrink-0 bg-border" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  navigate("/")
+                }}
+                className="flex w-full shrink-0 items-center gap-2 rounded-[100px] px-3.5 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+              >
+                <Avatar className="size-6">
+                  <AvatarFallback className="text-[10px]">{initials(user.name)}</AvatarFallback>
+                </Avatar>
+                <span className="flex-1">{user.name}</span>
+                <LogOut className="size-4 shrink-0" />
+              </button>
             </motion.div>
           ) : null}
         </AnimatePresence>
