@@ -3,7 +3,7 @@ import { PenLine } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart } from "@/components/charts"
+import { BarChart, RadialGauge } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,17 +81,30 @@ export default function ScorePage() {
         </div>
       </AsyncBoundary>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Average by course</CardTitle>
-          <CardDescription>Across every published exam</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-            <BarChart data={byCourse} tone="blue" />
-          </AsyncBoundary>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Average by course</CardTitle>
+            <CardDescription>Across every published exam</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <BarChart data={byCourse} tone="blue" />
+            </AsyncBoundary>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Institute average</CardTitle>
+            <CardDescription>All published marks</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center">
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <RadialGauge value={avg} tone={avg >= 60 ? "green" : "red"} label="average score" />
+            </AsyncBoundary>
+          </CardContent>
+        </Card>
+      </div>
 
       <DataTable
         name="scores"

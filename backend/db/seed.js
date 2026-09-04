@@ -88,15 +88,18 @@ const salaries = [
   { id: "FC-152", name: "Prof. Dev Bhatt", dept: "Electronics", gross: 98000, deductions: 9800, net: 88200, month: "Aug 2026", status: "Processing" },
 ];
 
+/** Turns a per-semester GPA list into the shape the Student schema expects. */
+const sgpa = (...values) => values.map((gpa, i) => ({ sem: i + 1, gpa }))
+
 const students = [
-  { id: "ST-8801", name: "Aisha Sheikh", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 93, cgpa: 8.7, feesDue: 0, fines: 0, email: "aisha.s@origin.edu", phone: "97400 11223", guardian: "Farhan Sheikh", status: "Active" },
-  { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 74, cgpa: 7.1, feesDue: 42000, fines: 500, email: "vivaan.g@origin.edu", phone: "97400 44881", guardian: "Ritu Gupta", status: "Active" },
-  { id: "ST-8803", name: "Tara Menon", program: "B.Tech ECE", sem: 3, dept: "Electronics", attendance: 88, cgpa: 9.1, feesDue: 0, fines: 0, email: "tara.m@origin.edu", phone: "97400 62190", guardian: "Anil Menon", status: "Active" },
-  { id: "ST-8804", name: "Dhruv Patel", program: "B.Tech MECH", sem: 7, dept: "Mechanical", attendance: 61, cgpa: 6.4, feesDue: 69000, fines: 1200, email: "dhruv.p@origin.edu", phone: "97400 33475", guardian: "Nita Patel", status: "Probation" },
-  { id: "ST-8805", name: "Riya Chandra", program: "B.Com Hons", sem: 1, dept: "Commerce", attendance: 97, cgpa: 8.2, feesDue: 12000, fines: 0, email: "riya.c@origin.edu", phone: "97400 90012", guardian: "Suresh Chandra", status: "Active" },
-  { id: "ST-8806", name: "Omar Ali", program: "B.Tech ECE", sem: 3, dept: "Electronics", attendance: 82, cgpa: 7.8, feesDue: 0, fines: 300, email: "omar.a@origin.edu", phone: "97400 71156", guardian: "Nadia Ali", status: "Active" },
-  { id: "ST-8807", name: "Kavya Reddy", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 90, cgpa: 8.9, feesDue: 39000, fines: 0, email: "kavya.r@origin.edu", phone: "97400 28840", guardian: "Mohan Reddy", status: "Active" },
-  { id: "ST-8808", name: "Neel Joshi", program: "B.Tech MECH", sem: 7, dept: "Mechanical", attendance: 79, cgpa: 7.4, feesDue: 0, fines: 0, email: "neel.j@origin.edu", phone: "97400 55329", guardian: "Prisha Joshi", status: "Active" },
+  { id: "ST-8801", name: "Aisha Sheikh", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 93, cgpa: 8.7, feesDue: 0, fines: 0, email: "aisha.s@origin.edu", phone: "97400 11223", guardian: "Farhan Sheikh", status: "Active", sgpaTrend: sgpa(8.3, 8.5, 8.6, 8.8, 8.7) },
+  { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 74, cgpa: 7.1, feesDue: 42000, fines: 500, email: "vivaan.g@origin.edu", phone: "97400 44881", guardian: "Ritu Gupta", status: "Active", sgpaTrend: sgpa(6.8, 6.5, 7.4, 6.9, 7.1) },
+  { id: "ST-8803", name: "Tara Menon", program: "B.Tech ECE", sem: 3, dept: "Electronics", attendance: 88, cgpa: 9.1, feesDue: 0, fines: 0, email: "tara.m@origin.edu", phone: "97400 62190", guardian: "Anil Menon", status: "Active", sgpaTrend: sgpa(8.9, 9.0, 9.1) },
+  { id: "ST-8804", name: "Dhruv Patel", program: "B.Tech MECH", sem: 7, dept: "Mechanical", attendance: 61, cgpa: 6.4, feesDue: 69000, fines: 1200, email: "dhruv.p@origin.edu", phone: "97400 33475", guardian: "Nita Patel", status: "Probation", sgpaTrend: sgpa(7.2, 6.9, 6.6, 6.1, 5.8, 6.0, 6.4) },
+  { id: "ST-8805", name: "Riya Chandra", program: "B.Com Hons", sem: 1, dept: "Commerce", attendance: 97, cgpa: 8.2, feesDue: 12000, fines: 0, email: "riya.c@origin.edu", phone: "97400 90012", guardian: "Suresh Chandra", status: "Active", sgpaTrend: sgpa(8.2) },
+  { id: "ST-8806", name: "Omar Ali", program: "B.Tech ECE", sem: 3, dept: "Electronics", attendance: 82, cgpa: 7.8, feesDue: 0, fines: 300, email: "omar.a@origin.edu", phone: "97400 71156", guardian: "Nadia Ali", status: "Active", sgpaTrend: sgpa(7.4, 7.6, 7.8) },
+  { id: "ST-8807", name: "Kavya Reddy", program: "B.Tech CSE", sem: 5, dept: "Computer Science", attendance: 90, cgpa: 8.9, feesDue: 39000, fines: 0, email: "kavya.r@origin.edu", phone: "97400 28840", guardian: "Mohan Reddy", status: "Active", sgpaTrend: sgpa(8.5, 8.6, 8.8, 8.7, 8.9) },
+  { id: "ST-8808", name: "Neel Joshi", program: "B.Tech MECH", sem: 7, dept: "Mechanical", attendance: 79, cgpa: 7.4, feesDue: 0, fines: 0, email: "neel.j@origin.edu", phone: "97400 55329", guardian: "Prisha Joshi", status: "Active", sgpaTrend: sgpa(7.0, 7.1, 7.3, 7.5, 7.2, 7.3, 7.4) },
 ];
 
 const courses = [

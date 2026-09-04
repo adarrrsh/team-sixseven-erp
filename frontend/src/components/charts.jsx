@@ -43,6 +43,159 @@ export function BarChart({ data, max = 100, tone = "pink", suffix = "%", classNa
   )
 }
 
+/**
+ * Small dependency-free line/area chart — a solid stroke over a flat, low-
+ * opacity fill (no gradients). Reads better than a bar chart for anything
+ * that's a trend over time rather than a comparison across categories.
+ * data: [{ label, value }].
+ */
+export function LineChart({ data, max, tone = "pink", suffix = "%", className, height = 168 }) {
+  const fill = FILL[tone]
+  const top = max ?? Math.max(...data.map((d) => d.value), 1)
+  const n = data.length
+  const stepX = n > 1 ? 100 / (n - 1) : 0
+  const pad = 12 // vertical padding inside the viewBox so dots/labels never clip
+  const yFor = (v) => pad + (1 - Math.min(v, top) / top) * (100 - pad * 2)
+  const points = data.map((d, i) => [n > 1 ? i * stepX : 50, yFor(d.value)])
+  const linePath = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ")
+  const areaPath = points.length
+    ? `${linePath} L${points.at(-1)[0]},100 L${points[0][0]},100 Z`
+    : ""
+
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      <div className="relative" style={{ height }}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="size-full overflow-visible">
+          <path d={areaPath} fill={fill} fillOpacity={0.12} stroke="none" />
+          <path
+            d={linePath}
+            fill="none"
+            stroke={fill}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          {points.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={2.4} fill={fill} stroke="var(--card)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          ))}
+        </svg>
+        {data.map((d, i) => (
+          <span
+            key={d.label}
+            className="absolute -translate-x-1/2 text-xs font-medium text-muted-foreground tabular-nums"
+            style={{ left: `${points[i][0]}%`, top: `calc(${points[i][1]}% - 20px)` }}
+          >
+            {d.value}
+            {suffix}
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-3 border-t border-border pt-2">
+        {data.map((d) => (
+          <span key={d.label} className="flex-1 text-center text-xs text-muted-foreground">
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Ring breakdown — same data shape as `SplitBars` (label/value/tone), read
+ * as a proportion at a glance instead of a linear split.
+ */
+export function DonutChart({ data, size = 168, thickness = 22, centerLabel, centerValue, className }) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1
+  const r = 50 - thickness / 2
+  const circumference = 2 * Math.PI * r
+
+  // Each segment's offset is the running length of every segment before it —
+  // built functionally (no mutation during render) via reduce.
+  const segments = data.reduce((rows, d) => {
+    const dash = (d.value / total) * circumference
+    const offset = rows.length ? rows.at(-1).offset + rows.at(-1).dash : 0
+    return [...rows, { ...d, dash, offset }]
+  }, [])
+
+  return (
+    <div className={cn("flex items-center gap-5", className)}>
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+          <circle cx="50" cy="50" r={r} fill="none" stroke="var(--muted)" strokeWidth={thickness} />
+          {segments.map((d) => (
+            <circle
+              key={d.label}
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              stroke={FILL[d.tone]}
+              strokeWidth={thickness}
+              strokeDasharray={`${d.dash} ${circumference - d.dash}`}
+              strokeDashoffset={-d.offset}
+            />
+          ))}
+        </svg>
+        {centerValue != null ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xl font-semibold tabular-nums">{centerValue}</span>
+            {centerLabel ? <span className="text-xs text-muted-foreground">{centerLabel}</span> : null}
+          </div>
+        ) : null}
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {data.map((d) => (
+          <li key={d.label} className="flex items-center gap-2 text-sm">
+            <span className="size-2 shrink-0 rounded-full" style={{ background: FILL[d.tone] }} />
+            <span className="text-muted-foreground">{d.label}</span>
+            <span className="ml-auto font-medium tabular-nums">{d.display ?? d.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Single-value radial progress ring — a focal number with its share filled in. */
+export function RadialGauge({ value, max = 100, tone = "pink", suffix = "%", label, size = 168, thickness = 14, className }) {
+  const r = 50 - thickness / 2
+  const circumference = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(1, max ? value / max : 0))
+  const dash = pct * circumference
+
+  return (
+    <div className={cn("flex flex-col items-center gap-2", className)}>
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+          <circle cx="50" cy="50" r={r} fill="none" stroke="var(--muted)" strokeWidth={thickness} />
+          <circle
+            cx="50"
+            cy="50"
+            r={r}
+            fill="none"
+            stroke={FILL[tone]}
+            strokeWidth={thickness}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circumference - dash}`}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span
+            className="font-semibold tabular-nums"
+            style={{ fontSize: Math.max(11, size * 0.15) }}
+          >
+            {value}
+            {suffix}
+          </span>
+        </div>
+      </div>
+      {label ? <span className="text-sm text-muted-foreground">{label}</span> : null}
+    </div>
+  )
+}
+
 /** Horizontal breakdown bars — used for department / fee splits. */
 export function SplitBars({ data, className }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1

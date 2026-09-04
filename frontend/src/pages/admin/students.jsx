@@ -3,10 +3,12 @@ import { Plus } from "lucide-react"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
+import { DonutChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/primitives"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,6 +74,15 @@ export default function StudentManagement() {
 
   const dueTotal = students.reduce((s, r) => s + r.feesDue, 0)
 
+  const STATUS_TONE = { Active: "green", Probation: "pink", Alumni: "blue", Inactive: "red" }
+  const byStatus = [...new Set(students.map((s) => s.status))]
+    .map((status) => ({
+      label: status,
+      value: students.filter((s) => s.status === status).length,
+      tone: STATUS_TONE[status] ?? "blue",
+    }))
+    .filter((d) => d.value > 0)
+
   return (
     <>
       <PageHeader
@@ -110,7 +121,18 @@ export default function StudentManagement() {
           <TabsTrigger value="score">Score</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="directory">
+        <TabsContent value="directory" className="flex flex-col gap-4">
+          {byStatus.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Students by status</CardTitle>
+                <CardDescription>Active, probation, alumni and inactive, on roll</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DonutChart data={byStatus} centerValue={students.length} centerLabel="students" />
+              </CardContent>
+            </Card>
+          ) : null}
           <DataTable
             name="student-registry"
             empty={loading ? "Loading…" : "No students on roll yet."}

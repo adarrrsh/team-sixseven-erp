@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart, SplitBars } from "@/components/charts"
+import { LineChart, SplitBars } from "@/components/charts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -65,7 +65,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-              <BarChart data={feeCollectionTrend} tone="blue" />
+              <LineChart data={feeCollectionTrend} tone="blue" />
             </AsyncBoundary>
           </CardContent>
         </Card>

@@ -3,11 +3,13 @@ import { Check, X } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
+import { DonutChart } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/primitives"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AsyncBoundary, CardsSkeleton, ErrorState } from "@/components/async-boundary"
+import { AsyncBoundary, CardsSkeleton, ErrorState, Skeleton } from "@/components/async-boundary"
 import { useApiAll } from "@/lib/use-api"
 import { decideAdmission, getAdmissionFees, getAdmissions } from "@/lib/api"
 import { inr, pct } from "@/lib/utils"
@@ -102,6 +104,28 @@ export default function Admissions() {
       </AsyncBoundary>
 
       {decisionError ? <ErrorState error={decisionError} /> : null}
+
+      {rows.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Decisions this intake</CardTitle>
+            <CardDescription>Pending, approved and rejected, out of {rows.length} applications</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <DonutChart
+                data={[
+                  { label: "Pending", value: pending.length, tone: "pink" },
+                  { label: "Approved", value: approved.length, tone: "green" },
+                  { label: "Rejected", value: rejected.length, tone: "red" },
+                ]}
+                centerValue={rows.length}
+                centerLabel="total"
+              />
+            </AsyncBoundary>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Tabs defaultValue="requests">
         <TabsList>

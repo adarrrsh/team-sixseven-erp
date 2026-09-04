@@ -3,7 +3,7 @@ import { Check, Plus, X } from "lucide-react"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart } from "@/components/charts"
+import { DonutChart, LineChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
@@ -58,6 +58,15 @@ export default function FacultyManagement() {
   const avgAttendance = faculty.length
     ? Math.round(faculty.reduce((s, f) => s + f.attendance, 0) / faculty.length)
     : 0
+
+  const DEPT_TONE = ["pink", "blue", "green", "red"]
+  const byDept = [...new Set(faculty.map((f) => f.dept))]
+    .sort()
+    .map((dept, i) => ({
+      label: dept,
+      value: faculty.filter((f) => f.dept === dept).length,
+      tone: DEPT_TONE[i % DEPT_TONE.length],
+    }))
 
   /**
    * Approving leave also flips the teacher's status server-side, which the
@@ -116,7 +125,18 @@ export default function FacultyManagement() {
           <TabsTrigger value="duty">Invigilator duty</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="directory">
+        <TabsContent value="directory" className="flex flex-col gap-4">
+          {byDept.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Faculty by department</CardTitle>
+                <CardDescription>Headcount across the institute</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DonutChart data={byDept} centerValue={faculty.length} centerLabel="teachers" />
+              </CardContent>
+            </Card>
+          ) : null}
           <DataTable
             name="teacher-registry"
             rows={faculty}
@@ -185,7 +205,7 @@ export default function FacultyManagement() {
             </CardHeader>
             <CardContent>
               <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-                <BarChart data={attendanceTrend} tone="pink" />
+                <LineChart data={attendanceTrend} tone="pink" />
               </AsyncBoundary>
             </CardContent>
           </Card>

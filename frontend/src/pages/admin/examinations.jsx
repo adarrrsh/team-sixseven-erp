@@ -3,8 +3,10 @@ import { Plus, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
+import { DonutChart } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,6 +45,15 @@ export default function Examinations() {
   const upcoming = exams.filter((e) => e.status !== "Completed")
   const history = exams.filter((e) => e.status === "Completed")
 
+  const STATUS_TONE = { Draft: "pink", Scheduled: "blue", Completed: "green", Cancelled: "red" }
+  const byStatus = [...new Set(exams.map((e) => e.status))]
+    .map((status) => ({
+      label: status,
+      value: exams.filter((e) => e.status === status).length,
+      tone: STATUS_TONE[status] ?? "blue",
+    }))
+    .filter((d) => d.value > 0)
+
   const columns = [
     { key: "id", header: "Exam" },
     { key: "title", header: "Title" },
@@ -72,6 +83,18 @@ export default function Examinations() {
           <StatCard label="Unassigned duty" value={exams.filter((e) => e.invigilator === "Unassigned").length} hint="needs an invigilator" tone="red" />
         </div>
       </AsyncBoundary>
+
+      {byStatus.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Exams by status</CardTitle>
+            <CardDescription>Draft, scheduled, completed and cancelled</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DonutChart data={byStatus} centerValue={exams.length} centerLabel="exams" />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Tabs defaultValue="upcoming">
         <TabsList>

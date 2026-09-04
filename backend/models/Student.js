@@ -9,6 +9,12 @@ const StudentSchema = schema({
   dept: { type: String, required: true, index: true },
   attendance: { type: Number, default: 100 },
   cgpa: { type: Number, default: 0 },
+  // One entry per completed semester, ending at the current `cgpa` — the
+  // student portal's CGPA tracker chart reads this directly.
+  sgpaTrend: {
+    type: [{ sem: Number, gpa: Number, _id: false }],
+    default: [],
+  },
   feesDue: { type: Number, default: 0 },
   fines: { type: Number, default: 0 },
   email: { type: String, default: "—" },

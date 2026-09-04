@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { ArrowRight, CalendarDays, IndianRupee, UserPlus, Users } from "lucide-react"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
-import { BarChart, SplitBars } from "@/components/charts"
+import { LineChart, SplitBars } from "@/components/charts"
 import { OrgGraph } from "@/components/org-graph"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
               onRetry={refresh}
               skeleton={<Skeleton className="h-44 w-full" />}
             >
-              <BarChart data={attendanceTrend} tone="pink" />
+              <LineChart data={attendanceTrend} tone="pink" />
             </AsyncBoundary>
           </CardContent>
         </Card>

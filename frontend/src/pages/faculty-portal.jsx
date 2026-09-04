@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart } from "@/components/charts"
+import { LineChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
@@ -106,7 +106,7 @@ function Today() {
           </CardHeader>
           <CardContent>
             <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
-              <BarChart data={data.attendance?.trend ?? []} tone="pink" />
+              <LineChart data={data.attendance?.trend ?? []} tone="pink" />
             </AsyncBoundary>
           </CardContent>
         </Card>

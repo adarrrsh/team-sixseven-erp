@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell"
 import { PageHeader, Section } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
-import { BarChart } from "@/components/charts"
+import { BarChart, DonutChart, LineChart } from "@/components/charts"
 import { TimetableGrid } from "@/components/timetable-grid"
 import { Button } from "@/components/ui/button"
 import { Badge, StatusBadge } from "@/components/ui/badge"
@@ -26,7 +26,7 @@ import {
 import { AsyncBoundary, CardsSkeleton, Skeleton } from "@/components/async-boundary"
 import { useApi } from "@/lib/use-api"
 import { getStudentProfile, getTimetable, payStudentDue } from "@/lib/api"
-import { inr } from "@/lib/utils"
+import { inr, pct } from "@/lib/utils"
 
 const ME = { id: "ST-8802", name: "Vivaan Gupta", program: "B.Tech CSE", sem: 5 }
 
@@ -133,6 +133,23 @@ function Overview() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>CGPA tracker</CardTitle>
+          <CardDescription>Semester GPA, cumulative through semester {me?.sem ?? ME.sem}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+            <LineChart
+              data={(me?.sgpaTrend ?? []).map((s) => ({ label: `Sem ${s.sem}`, value: s.gpa }))}
+              max={10}
+              suffix=""
+              tone="pink"
+            />
+          </AsyncBoundary>
+        </CardContent>
+      </Card>
 
       <Section title="This week" description="Your class timetable">
         <AsyncBoundary
@@ -282,6 +299,27 @@ function Fees() {
           <StatCard label="Paid so far" value={inr(paidSoFar)} hint="all heads" tone="green" />
         </div>
       </AsyncBoundary>
+
+      {myFees.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Paid vs due</CardTitle>
+            <CardDescription>Across every fee head this semester</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AsyncBoundary loading={loading} error={error} onRetry={refresh} skeleton={<Skeleton className="h-44 w-full" />}>
+              <DonutChart
+                data={[
+                  { label: "Paid", value: paidSoFar, tone: "green", display: inr(paidSoFar) },
+                  { label: "Due", value: tuitionDue, tone: tuitionDue ? "red" : "green", display: inr(tuitionDue) },
+                ]}
+                centerValue={`${pct(paidSoFar, paidSoFar + tuitionDue)}%`}
+                centerLabel="paid"
+              />
+            </AsyncBoundary>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Section title="Fee heads">
         <DataTable

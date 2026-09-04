@@ -10,6 +10,7 @@ import {
   PanelsTopLeft,
   XCircle,
 } from "lucide-react"
+import { RadialGauge } from "@/components/charts"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/primitives"
@@ -110,7 +111,7 @@ const TONE = {
   red: "bg-red-soft text-red-strong",
 }
 
-function Shell({ icon: Icon, tone, title, description, children }) {
+function Shell({ icon: Icon, tone, title, description, progress, children }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -127,6 +128,15 @@ function Shell({ icon: Icon, tone, title, description, children }) {
               <CardTitle>{title}</CardTitle>
               <CardDescription>{description}</CardDescription>
             </div>
+            {progress != null ? (
+              <RadialGauge
+                value={progress}
+                tone={tone === "red" ? "red" : "green"}
+                size={56}
+                thickness={6}
+                className="ml-auto shrink-0"
+              />
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">{children}</CardContent>
@@ -154,6 +164,7 @@ function UnderReview({ application }) {
       tone="pink"
       title="Application under review"
       description="The registrar's office has your request."
+      progress={33}
     >
       <Summary application={application}>
         <Row k="Status" v={<Badge tone="pink">Pending review</Badge>} />
@@ -224,6 +235,7 @@ function AwaitingPayment({ application, onPaid }) {
       tone="green"
       title="Congratulations — you have a seat"
       description="Confirm it by paying the admission fee."
+      progress={66}
     >
       <Summary application={application}>
         <Row k="Status" v={<Badge tone="green">Approved</Badge>} />
@@ -260,6 +272,7 @@ function Confirmed({ application, credentials }) {
       tone="green"
       title="Admission confirmed"
       description="Your seat is secured and your fee has been received."
+      progress={100}
     >
       <Summary application={application}>
         <Row k="Fee status" v={<Badge tone="green">Paid</Badge>} />
