@@ -40,7 +40,7 @@ const EDGE_COLOR = {
   red: "var(--red-strong)",
 }
 
-const COLUMN_WIDTH = 215
+const LEAF_SPACING = 215
 const POLL_MS = 15000
 const DOT_COUNT = 3
 const FLOW_DURATION = 2.6
@@ -111,30 +111,55 @@ function FlowEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targ
 const edgeTypes = { flow: FlowEdge }
 
 /**
- * Lays the API's nodes out in tiers — institute, departments, faculty, courses —
- * centring each row so the tree reads top-down.
+ * A true centred-tree layout, not just a row-per-tier grid: each node's x is
+ * the midpoint of its own children's x, and children get sequential,
+ * contiguous leaf slots under their parent. That ordering guarantees two
+ * wires can never cross — a tier's left-to-right order always matches its
+ * parents' order one level up, so no child ever has to reach sideways past
+ * a sibling subtree to find its parent. y still comes from the fixed tier
+ * row (institute/department/faculty/course) so the tree reads top-down.
  */
-function layout(nodes) {
-  const rows = {}
-  for (const node of nodes) {
-    ;(rows[node.kind] ??= []).push(node)
+function layout(nodes, edges) {
+  const childrenOf = new Map()
+  const hasParent = new Set()
+  for (const e of edges) {
+    hasParent.add(e.target)
+    if (!childrenOf.has(e.source)) childrenOf.set(e.source, [])
+    childrenOf.get(e.source).push(e.target)
   }
-  const widest = Math.max(...Object.values(rows).map((r) => r.length), 1)
+  const roots = nodes.filter((n) => !hasParent.has(n.id))
 
-  return Object.entries(rows).flatMap(([kind, group]) => {
-    const tier = TIER[kind] ?? TIER.course
-    const offset = ((widest - group.length) * COLUMN_WIDTH) / 2
-    return group.map((node, i) => ({
+  const xOf = new Map()
+  let nextLeaf = 0
+  const assignX = (id) => {
+    if (xOf.has(id)) return xOf.get(id)
+    const kids = childrenOf.get(id) ?? []
+    let x
+    if (kids.length === 0) {
+      x = nextLeaf * LEAF_SPACING
+      nextLeaf += 1
+    } else {
+      const childXs = kids.map(assignX)
+      x = (Math.min(...childXs) + Math.max(...childXs)) / 2
+    }
+    xOf.set(id, x)
+    return x
+  }
+  roots.forEach((r) => assignX(r.id))
+
+  return nodes.map((node) => {
+    const tier = TIER[node.kind] ?? TIER.course
+    return {
       id: node.id,
       type: "erp",
-      position: { x: offset + i * COLUMN_WIDTH, y: tier.y },
+      position: { x: xOf.get(node.id) ?? 0, y: tier.y },
       data: {
         kind: tier.label,
         label: node.label,
         meta: node.meta ?? node.dept,
         tone: tier.tone,
       },
-    }))
+    }
   })
 }
 
@@ -153,7 +178,7 @@ export function OrgGraph({ height = 520 }) {
     { pollMs: POLL_MS },
   )
 
-  const computedNodes = useMemo(() => layout(data.nodes), [data.nodes])
+  const computedNodes = useMemo(() => layout(data.nodes, data.edges), [data.nodes, data.edges])
 
   // Colour each wire by the tier it leaves from (institute -> department
   // edges are pink, department -> faculty blue, and so on).
@@ -222,19 +247,13 @@ export function OrgGraph({ height = 520 }) {
           <Background gap={22} size={1.4} color="oklch(0.9 0.01 340)" />
           <Controls showInteractive={false} className="rounded-xl border border-border" />
         </ReactFlow>
-        <div className="absolute top-3 right-3 flex items-center gap-2">
-          <span className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
-            <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-green" />
-            Live
-          </span>
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
-          >
-            Reset layout
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={reset}
+          className="absolute top-3 right-3 rounded-xl bg-pink-strong px-3 py-1.5 text-xs font-semibold text-white shadow-[0_6px_16px_-6px_rgba(214,51,132,0.6)] transition-colors hover:bg-pink"
+        >
+          Reset layout
+        </button>
       </div>
     </AsyncBoundary>
   )
