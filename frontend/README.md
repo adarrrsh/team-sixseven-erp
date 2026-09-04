@@ -1,16 +1,53 @@
-# React + Vite
+# Origin · Campus ERP (frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite + Tailwind v4 + shadcn/ui + framer-motion. Four surfaces:
+a shared **login**, an **admission application** with a dummy payment step,
+and the **Admin**, **Faculty** and **Student** portals.
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev      # http://localhost:5173
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Point the app at the Express backend with `VITE_API_URL` (defaults to
+`http://localhost:8000`). Payment calls fall back to a locally generated
+receipt when the backend is not running, so every flow stays demoable.
 
-## React Compiler
+## Routes
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Route | What it is |
+| --- | --- |
+| `/` | Sign-in (Admin / Faculty / Student) + helpdesk chatbot |
+| `/apply` | Admission application → dummy payment → receipt |
+| `/admin` | Dashboard with the React Flow institute graph |
+| `/admin/admissions` | Requests · approved · rejected · fee tracker |
+| `/admin/faculty` | Directory · leave · attendance · salary · timetable · invigilation |
+| `/admin/students` | Directory · attendance · fees · fines · courses · exams · score |
+| `/admin/finances` | Student fees · payroll · admission fees |
+| `/admin/timetable` | Availability-driven timetable that re-staffs itself |
+| `/admin/examinations` | Create / delete exams, history |
+| `/admin/score` | View and update marks |
+| `/faculty/*` | Today · timetable · class attendance · marks entry · leave · duty |
+| `/student/*` | Overview · timetable · courses · exams · score · fees & fines |
 
-## Expanding the ESLint configuration
+## Conventions
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Data export** — every table exports to `.csv` and `.xlsx` (`src/lib/export.js`).
+- **Design** — white surfaces, pink primary, red/green/blue signals; rounded
+  corners throughout; no gradients; no scroll-triggered animation (motion is
+  limited to mount, hover and dialog transitions).
+- **Colour tokens** live in `src/index.css` (`--pink`, `--pink-soft`,
+  `--pink-strong`, and the same triple for red / green / blue). Soft fills are
+  solid, never translucent, so text contrast always holds.
+- **Mock data** lives in `src/lib/data.js` — swap it for API calls.
+
+## Structure
+
+```
+src/
+  components/      app-shell, data-table, charts, org-graph (React Flow),
+                   timetable-grid, chatbot, hero-window, stat-card
+  components/ui/   shadcn/ui primitives (button, card, table, tabs, dialog, …)
+  lib/             data.js · export.js · api.js · utils.js
+  pages/           login, apply, admin/*, faculty-portal, student-portal
+```

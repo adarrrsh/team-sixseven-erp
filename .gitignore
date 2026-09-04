@@ -32,5 +32,3 @@ lerna-debug.log*
 *.sw?
 
 *.local
-
-frontend_dummy
