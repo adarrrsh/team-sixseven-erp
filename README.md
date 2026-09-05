@@ -10,7 +10,7 @@ A campus ERP web app with four interfaces — Admin, Faculty, Student and Applic
 
 ## Deployment Link
 
-[https://your-deployment-link.example.com](https://team-sixseven-erp.vercel.app/)
+[https://team-sixseven-erp.vercel.app/](https://team-sixseven-erp.vercel.app/)
 
 ## Table of Contents
 
