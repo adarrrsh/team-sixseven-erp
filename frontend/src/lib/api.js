@@ -159,3 +159,14 @@ async function pay(path, payload) {
     }
   }
 }
+
+/* ------------------------------------------------------- human handoff --- */
+
+/** Hands the conversation to a person, raising a ticket for the admin queue. */
+export const requestHandoff = (payload) => post("/api/support/handoff", payload)
+
+export const getSupportRequests = (params) => get("/api/support", params)
+export const getSupportStats = () => get("/api/support/stats")
+
+/** Claim, resolve, or add a reply to a ticket's thread. */
+export const updateSupportRequest = (id, payload) => patch(`/api/support/${id}`, payload)
