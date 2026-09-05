@@ -1,17 +1,15 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ArrowRight, FileText, GraduationCap, Lock, Mail, PanelsTopLeft, ShieldCheck, Users } from "lucide-react"
+import { ArrowRight, FileText, GraduationCap, Lock, Mail, ShieldCheck, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/primitives"
 import { HeroWindow } from "@/components/hero-window"
 import { Chatbot } from "@/components/chatbot"
 import { ErrorState } from "@/components/async-boundary"
-import { useApi } from "@/lib/use-api"
-import { getDashboard, login } from "@/lib/api"
+import { login } from "@/lib/api"
 import { saveSession } from "@/lib/session"
 import { cn } from "cn"
 
@@ -28,9 +26,6 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
   const active = ROLES.find((r) => r.id === role)
-
-  // Headline figures under the hero, straight from the institute record.
-  const { data: stats } = useApi(() => getDashboard(), [], null)
 
   /**
    * Credentials are checked by the backend, which also says which portal the
@@ -65,19 +60,6 @@ export default function Login() {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="flex flex-col gap-6"
         >
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-10 place-items-center rounded-2xl bg-primary text-primary-foreground">
-              <PanelsTopLeft className="size-5" />
-            </span>
-            <div className="flex flex-col">
-              <span className="font-semibold tracking-[-0.01em]">Origin</span>
-              <span className="text-xs text-muted-foreground">Campus ERP</span>
-            </div>
-            <Badge tone="pink" className="ml-2">
-              AY 2026 – 27
-            </Badge>
-          </div>
-
           <div className="flex flex-col gap-3">
             <h1 className="max-w-xl text-4xl leading-[1.05] font-semibold tracking-[-0.035em] sm:text-5xl">
               One campus, one record.
@@ -91,13 +73,6 @@ export default function Login() {
           <div className="overflow-hidden rounded-3xl border border-border bg-secondary p-5 sm:p-7">
             <HeroWindow className="h-auto w-full" />
           </div>
-
-          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <li>{stats ? `${stats.counts.students} students` : "— students"}</li>
-            <li>{stats ? `${stats.counts.faculty} faculty` : "— faculty"}</li>
-            <li>{stats ? `${stats.studentsByDept.length} departments` : "— departments"}</li>
-            <li>Every table exports to .csv / .xlsx</li>
-          </ul>
         </motion.section>
 
         <motion.section
