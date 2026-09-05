@@ -1,4 +1,3 @@
-/** Client for the Express backend in `backend/` — every page's data comes through here, live. */
 const BASE = import.meta.env.VITE_API_URL ?? "https://team-sixseven-erp-uvlo.vercel.app"
 
 function query(params) {
@@ -27,33 +26,22 @@ const patch = (path, body) => request("PATCH", path, body)
 const put = (path, body) => request("PUT", path, body)
 const del = (path) => request("DELETE", path)
 
-/* ---------------------------------------------------------------- auth --- */
-
 export const login = (email, password, role) =>
   post("/api/auth/login", { email, password, role })
 
-/* ---------------------------------------------------------- applicants --- */
-
-/** Submits the admission form and opens the applicant's tracking login. */
 export const registerApplicant = (payload) => post("/api/applicants/register", payload)
 
-/** The applicant portal's single source of truth: stage, application, credentials. */
 export const getApplicantStatus = (email) => get("/api/applicants/me", { email })
 
 export const getProgrammeFees = () => get("/api/applicants/fees")
 
-/** Seat fee for an approved application. Returns the issued student login. */
 export const payAdmissionFee = (payload) => post("/api/payments/admission", payload)
-
-/* ---------------------------------------------------------- admissions --- */
 
 export const getAdmissions = (params) => get("/api/admissions", params)
 export const getAdmissionStats = () => get("/api/admissions/stats")
 export const getAdmissionFees = (params) => get("/api/admissions/fees", params)
 export const decideAdmission = (id, status) =>
   patch(`/api/admissions/${id}/status`, { status })
-
-/* ------------------------------------------------------------- faculty --- */
 
 export const getFaculty = (params) => get("/api/faculty", params)
 export const getFacultyMember = (id) => get(`/api/faculty/${id}`)
@@ -76,8 +64,6 @@ export const getInvigilatorDuties = () => get("/api/faculty/duties")
 export const assignInvigilator = (examId, invigilator) =>
   patch(`/api/faculty/duties/${examId}`, { invigilator })
 
-/* ------------------------------------------------------------ students --- */
-
 export const getStudents = (params) => get("/api/students", params)
 export const getStudent = (id) => get(`/api/students/${id}`)
 export const getStudentProfile = (id) => get(`/api/students/${id}/profile`)
@@ -91,38 +77,24 @@ export const getFines = (params) => get("/api/students/fines", params)
 export const raiseFine = (payload) => post("/api/students/fines", payload)
 export const settleFine = (id) => patch(`/api/students/fines/${id}/settle`)
 
-/* ---------------------------------------------------------- attendance --- */
-
-/** The day register. Filter by date, holder, or status. */
 export const getAttendance = (params) => get("/api/attendance", params)
 
-/** Everyone seen so far today, with present/absent totals. */
 export const getAttendanceToday = () => get("/api/attendance/today")
 
-/**
- * Marks one person present or absent for a date, by hand. RFID scans write the
- * same records, so a correction here and a card tap are the same register.
- */
 export const setAttendance = (holderId, { date, status, holderType = "student" }) =>
   patch(`/api/attendance/${holderId}`, { date, status, holderType })
 
-/** One row per person: days present, absent, and the resulting percentage. */
 export const getAttendanceSummary = (holderType = "student") =>
   get("/api/attendance/summary", { holderType })
 
-/** Cohort turnout per day, oldest first, shaped for the chart components. */
 export const getAttendanceTrend = (holderType = "student", days = 14) =>
   get("/api/attendance/trend", { holderType, days })
 
-/** One person's register plus totals, streak and exam eligibility. */
 export const getAttendanceHistory = (holderId, holderType = "student") =>
   get(`/api/attendance/history/${holderId}`, { holderType })
 
-/** End-of-day roll: everyone who never tapped in is marked absent. */
 export const closeAttendanceDay = (date, holderType = "student") =>
   post("/api/attendance/close-day", { date, holderType })
-
-/* --------------------------------------------------------- rfid cards --- */
 
 export const getCards = (params) => get("/api/cards", params)
 export const issueCard = (payload) => post("/api/cards", payload)
@@ -130,14 +102,10 @@ export const setCardStatus = (cardId, status) =>
   patch(`/api/cards/${encodeURIComponent(cardId)}`, { status })
 export const revokeCard = (cardId) => del(`/api/cards/${encodeURIComponent(cardId)}`)
 
-/* ------------------------------------------------------------- courses --- */
-
 export const getCourses = (params) => get("/api/courses", params)
 export const createCourse = (payload) => post("/api/courses", payload)
 export const updateCourse = (code, payload) => patch(`/api/courses/${code}`, payload)
 export const deleteCourse = (code) => del(`/api/courses/${code}`)
-
-/* --------------------------------------------------- exams and scores --- */
 
 export const getExams = (params) => get("/api/exams", params)
 export const getExam = (id) => get(`/api/exams/${id}`)
@@ -151,53 +119,29 @@ export const getScoresByCourse = () => get("/api/scores/by-course")
 export const getScoreStats = () => get("/api/scores/stats")
 export const publishScore = (payload) => post("/api/scores", payload)
 
-/** Scores key on (student, course) — pass a row's `recordId` or that pair. */
 export const updateMarks = (row, marks) =>
   patch(`/api/scores/${row.recordId ?? `${row.id}::${row.course}`}`, { marks })
-
-/* ------------------------------------------------------------ finances --- */
 
 export const getFinanceSummary = () => get("/api/finances/summary")
 export const getCollectionTrend = () => get("/api/finances/collection-trend")
 
-/* ----------------------------------------------------------- timetable --- */
-
-/** Returns { days, periods, timetable, changes, version, unavailable }. */
 export const getTimetable = (params) => get("/api/timetable", params)
 export const rebuildTimetable = (unavailable, scope) =>
   post("/api/timetable/rebuild", { unavailable, scope })
 export const setTimetableSlot = (payload) => put("/api/timetable/slot", payload)
 
-/* ----------------------------------------------------------- dashboard --- */
-
 export const getDashboard = () => get("/api/dashboard")
 export const getDepartments = () => get("/api/dashboard/departments")
 export const getOrgGraph = () => get("/api/dashboard/org-graph")
 
-/* ------------------------------------------------------------- chatbot --- */
-
-/** { message } -> { reply, isFallback }. Server-side Gemini proxy — see backend/routers/chatbot.js. */
 export const askChatbot = (message) => post("/api/chatbot", { message })
 
-/* ------------------------------------------------------------ payments --- */
-
-/** Semester fees and fines from the student portal. */
 export async function payStudentDue(payload) {
   return pay("/api/payments/student", payload)
 }
 
 export const getPayments = (params) => get("/api/payments", params)
 
-/**
- * `fetch()` itself rejects with a `TypeError` when the network request never
- * reaches a server at all (offline, backend down, DNS failure, CORS block).
- * `request()` above throws a plain `Error` once it *has* a response and the
- * backend deliberately rejected it (bad amount, unknown student, ...) — that
- * distinction is exactly what decides whether the fake local receipt below
- * is appropriate. Only genuine unreachability should ever produce one; a
- * real rejection from a reachable backend must reach the caller as itself,
- * or a broken payment would render as a successful one.
- */
 async function pay(path, payload) {
   try {
     const data = await post(path, payload)

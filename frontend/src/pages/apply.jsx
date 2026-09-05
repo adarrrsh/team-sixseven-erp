@@ -24,11 +24,6 @@ import { cn } from "cn"
 
 const STEPS = ["Applicant", "Programme", "Account"]
 
-/**
- * The admission form. It opens an applicant account and files the request —
- * no money changes hands here. The seat fee only becomes payable from the
- * applicant portal once the registrar approves.
- */
 export default function Apply() {
   const navigate = useNavigate()
   const { data: programmes } = useApi(() => getProgrammeFees(), [], [])

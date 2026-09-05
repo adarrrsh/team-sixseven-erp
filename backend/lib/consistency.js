@@ -12,15 +12,6 @@ const Leave = require("../models/Leave");
 const { grade } = require("./grade");
 const { toDate } = require("./attendance");
 
-/**
- * Checks every denormalised field against the records it is derived from.
- *
- * Several figures are stored on the parent document for the dashboards to read
- * cheaply — a student's attendance percentage, their outstanding fees, their
- * unpaid fines. Each one can drift from its source, and a drifted value is what
- * shows up as two screens disagreeing about the same student. Returns a flat
- * list of findings; empty means the database is internally consistent.
- */
 async function checkConsistency() {
   const issues = [];
   const flag = (kind, detail) => issues.push({ kind, detail });
@@ -47,7 +38,6 @@ async function checkConsistency() {
     return { percentage: Math.round((present / rows.length) * 100), present, days: rows.length };
   };
 
-  /* --- stored attendance percentage must equal the register --- */
   for (const [people, type] of [[students, "student"], [faculty, "faculty"]]) {
     for (const person of people) {
       const derived = fromRegister(type, person.id);
@@ -60,16 +50,6 @@ async function checkConsistency() {
     }
   }
 
-  /**
-   * A faculty's `status` field is a denormalized cache `PATCH
-   * /faculty/leaves/:id/status` writes at the moment a decision is made —
-   * it can drift from the Leave collection it's meant to summarise (a leave
-   * still Pending left `status` at a stale "On leave" from an old record;
-   * an approved leave's date range ended and nothing ever flipped `status`
-   * back). The timetable no longer trusts this field for restaffing, but a
-   * drifted value here still shows up as a wrong badge in the faculty
-   * directory, so it's still worth catching directly.
-   */
   const today = toDate();
   const onLeaveNow = new Set(
     leaves.filter((l) => l.status === "Approved" && l.from <= today && l.to >= today).map((l) => l.name),
@@ -84,7 +64,6 @@ async function checkConsistency() {
     }
   }
 
-  /* --- a student's balances must equal their fee heads and unpaid fines --- */
   for (const s of students) {
     const owed = fees.filter((f) => f.id === s.id).reduce((n, f) => n + (f.payable - f.paid), 0);
     if (owed !== s.feesDue) flag("feesDue", `${s.id} ${s.name}: stored ₹${s.feesDue} vs heads ₹${owed}`);
@@ -95,7 +74,6 @@ async function checkConsistency() {
     if (unpaid !== s.fines) flag("fines", `${s.id} ${s.name}: stored ₹${s.fines} vs unpaid ₹${unpaid}`);
   }
 
-  /* --- a paid admission must have a tracker row and an issued student --- */
   for (const a of admissions) {
     if (a.feeStatus !== "Paid") continue;
     const row = admFees.find((f) => f.id === a.id);
@@ -105,13 +83,11 @@ async function checkConsistency() {
     if (!a.studentId) flag("admissionFee", `${a.id} ${a.name}: seat paid for but no student was enrolled`);
   }
 
-  /* --- grades are a pure function of marks --- */
   for (const s of scores) {
     if (s.grade !== grade(s.marks))
       flag("grade", `${s.id} ${s.course}: ${s.marks} marks graded ${s.grade}, expected ${grade(s.marks)}`);
   }
 
-  /* --- nothing may reference a record that is not there --- */
   const has = (pool, id) => pool.some((p) => p.id === id);
   for (const s of scores) if (!has(students, s.id)) flag("orphan", `score for unknown student ${s.id} (${s.course})`);
   for (const a of admissions)
@@ -129,7 +105,6 @@ async function checkConsistency() {
       flag("orphan", `user ${u.email} -> missing faculty ${u.linkedId}`);
   }
 
-  /* --- one active card per holder, or either tap marks them present --- */
   const activeByHolder = {};
   for (const c of cards.filter((c) => c.status === "Active")) {
     (activeByHolder[`${c.holderType}:${c.holderId}`] ??= []).push(c.cardId);

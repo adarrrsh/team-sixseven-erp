@@ -16,22 +16,14 @@ import {
   setAttendance,
 } from "@/lib/api"
 
-/** Today in the local calendar, matching how the backend dates a scan. */
 const today = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 10)
 
-/** "2026-09-05T09:12:44.000Z" -> "09:12". Blank when never seen. */
 const clock = (iso) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"
 
-/**
- * The day register for one cohort.
- *
- * Rows come from the same records the RFID readers write, so a card tap at the
- * gate and a correction made here are the same underlying register.
- */
 export function AttendanceRegister({ holderType = "student" }) {
   const [date, setDate] = useState(today())
   const [busy, setBusy] = useState(null)
@@ -46,7 +38,6 @@ export function AttendanceRegister({ holderType = "student" }) {
     { register: [], people: [] },
   )
 
-  // Everyone in the cohort, with their record for the day if one exists.
   const rows = data.people.map((person) => {
     const record = data.register.find((r) => r.holderId === person.id)
     return {

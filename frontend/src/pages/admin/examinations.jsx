@@ -159,7 +159,6 @@ function CreateExam({ onCreate, faculty }) {
 
   const [busy, setBusy] = useState(false)
 
-  // The exam ID is issued by the backend, which knows the highest one in use.
   const submit = async () => {
     setBusy(true)
     try {

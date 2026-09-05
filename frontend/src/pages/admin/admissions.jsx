@@ -24,13 +24,11 @@ export default function Admissions() {
   const admissionFees = data.fees
   const [busy, setBusy] = useState(null)
 
-  // Applicants pay from their own portal; poll so the tracker stays current.
   useEffect(() => {
     const timer = setInterval(refresh, 5000)
     return () => clearInterval(timer)
   }, [refresh])
 
-  /** Writes the decision, then swaps in the row the server returned. */
   const [decisionError, setDecisionError] = useState(null)
 
   const decide = async (id, status) => {
@@ -69,7 +67,6 @@ export default function Admissions() {
     { key: "fee", header: "Fee payable", align: "right", render: (r) => inr(r.fee) },
   ]
 
-  /** Whether the approved applicant has actually paid and taken the seat. */
   const seatColumns = [
     {
       key: "feeStatus",

@@ -9,7 +9,6 @@ const router = express.Router();
 
 const sum = (rows, key) => rows.reduce((total, row) => total + (row[key] ?? 0), 0);
 
-/** GET /api/finances/summary — the four cards and the "where the money sits" split. */
 router.get(
   "/summary",
   route(async (_req, res) => {
@@ -40,7 +39,6 @@ router.get(
   }),
 );
 
-/** GET /api/finances/collection-trend — the collection-rate bar chart. */
 router.get(
   "/collection-trend",
   route(async (_req, res) => {
@@ -49,7 +47,6 @@ router.get(
   }),
 );
 
-/** GET /api/finances/student-fees and /admission-fees back the two tabs. */
 router.get(
   "/student-fees",
   route(async (req, res) => {

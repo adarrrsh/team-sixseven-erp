@@ -6,14 +6,6 @@ dotenv.config();
 const URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = process.env.MONGODB_DB || "myDatabase";
 
-/**
- * One connection per process, reused across requests.
- *
- * On a serverless platform the module is re-evaluated on every cold start but
- * the container is reused between invocations, so the live connection is parked
- * on `globalThis`. Without this each request would open its own pool and
- * exhaust the Atlas connection limit.
- */
 const cache = (globalThis.__originMongo ??= { conn: null, promise: null });
 
 mongoose.connection.on("connected", () => {
@@ -26,7 +18,6 @@ mongoose.connection.on("error", (error) => {
 
 mongoose.connection.on("disconnected", () => {
   console.warn("MongoDB disconnected");
-  // Drop the cache so the next request dials again rather than reusing a corpse.
   cache.conn = null;
   cache.promise = null;
 });
@@ -39,11 +30,7 @@ async function connectDB() {
       .connect(URI, {
         dbName,
         serverSelectionTimeoutMS: 10000,
-        // A serverless container handles one request at a time; a big pool is
-        // wasted sockets against the Atlas limit.
         maxPoolSize: 10,
-        // Fail immediately when there is no connection instead of queueing the
-        // operation for ten seconds and then timing out with a misleading error.
         bufferCommands: false,
       })
       .then((m) => m.connection);
@@ -52,8 +39,6 @@ async function connectDB() {
   try {
     cache.conn = await cache.promise;
   } catch (error) {
-    // Let the next request retry rather than caching a rejected promise for
-    // the life of the container.
     cache.promise = null;
     throw error;
   }
@@ -68,11 +53,6 @@ async function disconnectDB() {
   console.log("MongoDB connection closed");
 }
 
-/**
- * Only a long-running process should tear the connection down on a signal.
- * A serverless container is frozen and thawed between invocations, and closing
- * the connection there would discard a pool the next request wants.
- */
 if (require.main === module || process.env.NODE_ENV === "development") {
   for (const signal of ["SIGINT", "SIGTERM"]) {
     process.on(signal, async () => {

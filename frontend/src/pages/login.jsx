@@ -27,10 +27,6 @@ export default function Login() {
   const navigate = useNavigate()
   const active = ROLES.find((r) => r.id === role)
 
-  /**
-   * Credentials are checked by the backend, which also says which portal the
-   * account belongs to — so a faculty login cannot land on the admin console.
-   */
   const submit = async (event) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)

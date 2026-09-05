@@ -15,14 +15,6 @@ const CANNED = [
 const SUPPORT_FALLBACK =
   "I couldn't help with that — please contact our support team at support@origin.edu and they'll get back to you."
 
-/**
- * Support chatbot anchored to the lower corner of the login page. Every
- * message goes to the backend's Gemini proxy (`POST /api/chatbot`) — the
- * quick-reply chips just prefill a common question, they don't shortcut the
- * AI. Anything the backend can't answer confidently comes back as the same
- * fixed support-contact line, whether that's the model declining or the
- * request failing outright.
- */
 export function Chatbot() {
   const [open, setOpen] = useState(false)
   const [log, setLog] = useState([

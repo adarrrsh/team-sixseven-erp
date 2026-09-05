@@ -1,4 +1,3 @@
-/** Wraps an async route so a rejected promise reaches the error middleware. */
 function route(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
@@ -13,7 +12,6 @@ class HttpError extends Error {
 const notFound = (what) => new HttpError(404, `${what} not found`);
 const badRequest = (message) => new HttpError(400, message);
 
-/** Next id in a series, e.g. nextId(Admission, "AD-", 2041). */
 async function nextId(Model, prefix, floor) {
   const rows = await Model.find({ id: new RegExp(`^${prefix}`) }, { id: 1 }).lean();
   const highest = rows.reduce((max, r) => {
@@ -23,11 +21,9 @@ async function nextId(Model, prefix, floor) {
   return prefix + (highest + 1);
 }
 
-/** Case-insensitive contains, safe against regex metacharacters in user input. */
 const contains = (value) =>
   new RegExp(String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
-/** Picks only the keys a client is allowed to write. */
 function pick(body, keys) {
   const out = {};
   for (const key of keys) {

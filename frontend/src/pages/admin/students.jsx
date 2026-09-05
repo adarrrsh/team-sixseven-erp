@@ -60,7 +60,6 @@ export default function StudentManagement() {
   const { students, fines, courses, exams, scores } = data
   const studentFees = data.fees
 
-  /** Settling a fine also decrements the student's outstanding balance. */
   const settle = async (id) => {
     const updated = await settleFine(id)
     setData((d) => ({
@@ -339,7 +338,6 @@ function AddStudent({ onAdd }) {
 
   const dept = form.dept || departments[0] || ""
 
-  // The student ID is issued by the backend, which knows the highest one in use.
   const submit = async () => {
     setBusy(true)
     try {

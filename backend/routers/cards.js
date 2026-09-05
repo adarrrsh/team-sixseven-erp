@@ -8,7 +8,6 @@ const { modelFor } = require("../lib/attendance");
 
 const router = express.Router();
 
-/** GET /api/cards?holderType=&status=&q= — the issued-card register. */
 router.get(
   "/",
   route(async (req, res) => {
@@ -21,7 +20,6 @@ router.get(
   }),
 );
 
-/** GET /api/cards/:cardId — look up a single card, as the reader would. */
 router.get(
   "/:cardId",
   route(async (req, res) => {
@@ -31,7 +29,6 @@ router.get(
   }),
 );
 
-/** POST /api/cards — issue a card to a student or teacher. */
 router.post(
   "/",
   route(async (req, res) => {
@@ -61,10 +58,6 @@ router.post(
   }),
 );
 
-/**
- * PATCH /api/cards/:cardId — report a card lost, or reactivate it.
- * A deactivated card stops opening the register but keeps its scan history.
- */
 router.patch(
   "/:cardId",
   route(async (req, res) => {

@@ -1,15 +1,3 @@
-/*
- * Origin campus ERP — RFID attendance reader (ESP32 + MFRC522v2).
- *
- * Cards are no longer authorised on the device. Every tap is posted to
- * POST /api/attendance/rfid, and the server matches the UID against the card
- * register, marks the holder present for the day and answers with who they are.
- * That means cards can be issued, moved or revoked from the admin console
- * without reflashing this board.
- *
- * The servo acts as the gate: it only opens once the server confirms the mark.
- */
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <time.h>
@@ -20,25 +8,17 @@
 #include <MFRC522Debug.h>
 #include <ESP32Servo.h>
 
-/* ---------------------------------------------------------------- config -- */
-
 #define WIFI_SSID  "your-wifi"
 #define WIFI_PASS  "your-wifi-password"
 
-/* The backend. Use the host's LAN IP — "localhost" is the ESP32 itself. */
 #define API_BASE   "http://192.168.1.10:8000"
 
-/* Must match RFID_DEVICE_KEY in the backend .env. Leave "" if it is unset. */
 #define DEVICE_KEY ""
 
-/* Identifies this reader in the attendance log. */
 #define READER_ID  "GATE-A"
 
-/* IST. Offset in seconds; no daylight saving. */
 #define TZ_OFFSET_SEC  19800
 #define TZ_SUFFIX      "+05:30"
-
-/* ------------------------------------------------------------------ pins -- */
 
 #define SS_PIN     21
 #define RST_PIN    22
@@ -49,8 +29,6 @@
 #define SERVO_OPEN    90
 #define GATE_OPEN_MS 800
 
-/* Ignore repeat taps of the same card so a card left on the reader does not
-   hammer the API. Different cards are always sent straight through. */
 #define SAME_CARD_COOLDOWN_MS 5000
 
 #define HTTP_TIMEOUT_MS 5000
@@ -63,9 +41,6 @@ Servo gate;
 String lastUid = "";
 unsigned long lastScanMs = 0;
 
-/* ----------------------------------------------------------------- utils -- */
-
-/** UID bytes as uppercase hex, e.g. "9CFE1A4A" — the form the API stores. */
 String uidToHex() {
   String out;
   for (byte i = 0; i < mfrc522.uid.size; i++) {
@@ -76,20 +51,14 @@ String uidToHex() {
   return out;
 }
 
-/** Current time as ISO 8601 with offset, e.g. "2026-09-05T09:12:44+05:30". */
 String isoTimestamp() {
   struct tm t;
-  if (!getLocalTime(&t, 1000)) return "";  // clock not synced yet
+  if (!getLocalTime(&t, 1000)) return "";
   char buf[32];
   strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &t);
   return String(buf) + TZ_SUFFIX;
 }
 
-/**
- * Pulls a string field out of the JSON response. The reply shape is small and
- * fixed, so this avoids pulling in a JSON library. Swap for ArduinoJson if the
- * response ever grows.
- */
 String jsonString(const String &body, const char *key) {
   String needle = String("\"") + key + "\":\"";
   int start = body.indexOf(needle);
@@ -100,8 +69,6 @@ String jsonString(const String &body, const char *key) {
   return body.substring(start, end);
 }
 
-/* -------------------------------------------------------------- feedback -- */
-
 void blink(int times, int onMs, int offMs) {
   for (int i = 0; i < times; i++) {
     digitalWrite(LED_PIN, HIGH);
@@ -111,7 +78,6 @@ void blink(int times, int onMs, int offMs) {
   }
 }
 
-/** Marked present: hold the LED and let them through. */
 void openGate() {
   digitalWrite(LED_PIN, HIGH);
   gate.write(SERVO_OPEN);
@@ -119,8 +85,6 @@ void openGate() {
   gate.write(SERVO_CLOSED);
   digitalWrite(LED_PIN, LOW);
 }
-
-/* ------------------------------------------------------------------ wifi -- */
 
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
@@ -143,12 +107,6 @@ void connectWiFi() {
   }
 }
 
-/* ------------------------------------------------------------- the call --- */
-
-/**
- * Posts one tap. Returns true when the holder was marked present (or was
- * already present today), false for a rejected card or a transport failure.
- */
 bool postScan(const String &uid) {
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
@@ -160,8 +118,6 @@ bool postScan(const String &uid) {
 
   String scannedAt = isoTimestamp();
   if (scannedAt.isEmpty()) {
-    // Without a synced clock the server would date the scan on its own arrival
-    // time; send nothing rather than a wrong timestamp and let it default.
     Serial.println(F("  !  clock not synced, omitting scannedAt"));
   }
 
@@ -186,7 +142,7 @@ bool postScan(const String &uid) {
   }
 
   switch (status) {
-    case 201: {  // first tap of the day
+    case 201: {
       Serial.print(F("  -> PRESENT: "));
       Serial.print(jsonString(body, "name"));
       Serial.print(F(" ("));
@@ -194,7 +150,7 @@ bool postScan(const String &uid) {
       Serial.println(F(")"));
       return true;
     }
-    case 200: {  // already marked earlier today
+    case 200: {
       Serial.print(F("  -> already present today: "));
       Serial.println(jsonString(body, "name"));
       return true;
@@ -219,8 +175,6 @@ bool postScan(const String &uid) {
   }
 }
 
-/* ----------------------------------------------------------------- setup -- */
-
 void setup() {
   Serial.begin(115200);
   delay(2000);
@@ -243,7 +197,6 @@ void setup() {
 
   connectWiFi();
 
-  // The board has no battery-backed clock, so the time comes from NTP.
   configTime(TZ_OFFSET_SEC, 0, "pool.ntp.org", "time.nist.gov");
   Serial.print(F("Clock: syncing"));
   for (int i = 0; i < 20 && isoTimestamp().isEmpty(); i++) {
@@ -257,8 +210,6 @@ void setup() {
   blink(2, 120, 120);
 }
 
-/* ------------------------------------------------------------------ loop -- */
-
 void loop() {
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
@@ -267,7 +218,6 @@ void loop() {
   Serial.print(F("Card "));
   Serial.print(uid);
 
-  // Only the same card is rate-limited; a different person is never delayed.
   if (uid == lastUid && millis() - lastScanMs < SAME_CARD_COOLDOWN_MS) {
     unsigned long left = (SAME_CARD_COOLDOWN_MS - (millis() - lastScanMs)) / 1000;
     Serial.print(F("  -> cooldown, "));
@@ -278,7 +228,7 @@ void loop() {
     if (postScan(uid)) {
       openGate();
     } else {
-      blink(3, 80, 80);  // rejected or unreachable
+      blink(3, 80, 80);
     }
     lastUid = uid;
     lastScanMs = millis();

@@ -29,7 +29,6 @@ function Badge({ className, tone, ...props }) {
   )
 }
 
-/** Shared status → tone map so every screen colours a status identically. */
 const STATUS_TONE = {
   Approved: "green",
   Paid: "green",

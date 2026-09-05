@@ -16,7 +16,6 @@ function Separator({ className, orientation = "horizontal", ...props }) {
   )
 }
 
-/** `tone` picks the fill colour from the palette. */
 function Progress({ className, value = 0, tone = "pink", ...props }) {
   const fill = {
     pink: "bg-pink",

@@ -57,8 +57,6 @@ export default function FacultyPortal() {
   const navigate = useNavigate()
   const session = loadSession()
 
-  // No stored session, or one that belongs to a different portal — bounce
-  // back to the login page rather than rendering someone else's data.
   useEffect(() => {
     if (!session || session.role !== "faculty") navigate("/", { replace: true })
   }, [session, navigate])
@@ -185,13 +183,6 @@ function MyTimetable() {
   )
 }
 
-/**
- * An Obsidian-style graph of my teaching network, exactly two layers deep:
- * me at the centre, the courses I teach one ring out, and — a ring beyond
- * that — the students actually enrolled in each one (matched by a course's
- * own department and semester against the full student roster, the same
- * join the rest of the app uses to decide who's "in" a course).
- */
 function Network() {
   const session = loadSession()
   const { data, error, loading, refresh } = useApiAll(
@@ -270,7 +261,6 @@ function MarksExams() {
   )
 }
 
-/** One exam's marks sheet — the rows `GET /api/exams/:id/scores` already keys to it. */
 function AssignScores() {
   const { examId } = useParams()
   const { data, error, loading, setData, refresh } = useApiAll(
@@ -366,14 +356,6 @@ function AssignScores() {
   )
 }
 
-/**
- * `GET /exams/:id/scores` only ever returns students who already have a
- * score row — there was no way, anywhere in the app, to grade someone for
- * the first time (the backend's `POST /scores` upsert existed but nothing
- * called it). This closes that gap: pick one of my own courses, pick a
- * student in that course's cohort who isn't already on the sheet, enter
- * their marks.
- */
 function AddScore({ exam, existingRows, onAdded }) {
   const session = loadSession()
   const { data: myCourses } = useApi(() => getCourses({ faculty: session?.name }), [session?.name], [])
@@ -512,8 +494,6 @@ function Leave() {
     [session?.name],
     [],
   )
-  // Only the leave form needs the department — worth its own small fetch
-  // rather than threading it through every other page on this portal.
   const { data: me } = useApi(
     () => getFacultyMember(session?.linkedId),
     [session?.linkedId],
@@ -556,11 +536,6 @@ function ApplyLeave({ onApply, name, dept }) {
   const [error, setError] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  // The request ID and the day count are worked out by the backend. The
-  // dialog only closes itself once that request actually succeeds — a
-  // rejection (validation error, unreachable backend) stays on screen with
-  // the reason, instead of the old behaviour of closing regardless and
-  // dropping the error silently.
   const submit = async () => {
     setBusy(true)
     setError(null)

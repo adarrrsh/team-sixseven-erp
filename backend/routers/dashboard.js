@@ -11,7 +11,6 @@ const { route } = require("../lib/http");
 
 const router = express.Router();
 
-/** GET /api/dashboard — the admin landing page in one round trip. */
 router.get(
   "/",
   route(async (_req, res) => {
@@ -55,7 +54,6 @@ router.get(
   }),
 );
 
-/** GET /api/dashboard/departments — the DEPARTMENTS list every filter uses. */
 router.get(
   "/departments",
   route(async (_req, res) => {
@@ -64,10 +62,6 @@ router.get(
   }),
 );
 
-/**
- * GET /api/dashboard/org-graph — nodes and edges for the React Flow graph:
- * institute → department → faculty, with courses hanging off each teacher.
- */
 router.get(
   "/org-graph",
   route(async (_req, res) => {

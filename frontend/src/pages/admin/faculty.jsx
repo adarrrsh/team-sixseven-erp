@@ -69,10 +69,6 @@ export default function FacultyManagement() {
       tone: DEPT_TONE[i % DEPT_TONE.length],
     }))
 
-  /**
-   * Approving leave also flips the teacher's status server-side, which the
-   * timetable re-staffs around — so pull both back down after a decision.
-   */
   const decide = async (id, status) => {
     const updated = await decideLeave(id, status)
     setData((d) => ({
@@ -312,7 +308,6 @@ function AddTeacher({ onAdd }) {
 
   const dept = form.dept || departments[0] || ""
 
-  // The staff ID is issued by the backend, which knows the highest one in use.
   const submit = async () => {
     setBusy(true)
     try {

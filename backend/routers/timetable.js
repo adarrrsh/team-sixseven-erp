@@ -7,25 +7,6 @@ const { route, badRequest } = require("../lib/http");
 
 const router = express.Router();
 
-/**
- * Who's actually unavailable today, straight from the Leave collection's own
- * approved, in-range requests — not `Faculty.status`. That field is only a
- * denormalized cache `PATCH /faculty/leaves/:id/status` writes at the moment
- * a decision is made; it drifts from the truth in both directions (a leave
- * still Pending can leave `status` at a stale "On leave" from an old record,
- * and nothing ever flips it back once an approved leave's date range ends).
- * Restaffing around a teacher who was never actually approved off — or who
- * came back weeks ago — is exactly the kind of false-data conflict this
- * avoids by checking the real source every time instead of a cached flag.
- *
- * `toDate()` (not `toISOString().slice(0, 10)`) — the latter normalises to
- * UTC, a different calendar day from local time for a good chunk of the
- * clock (e.g. any time before 5:30am IST), while `Leave.from`/`to` are plain
- * "YYYY-MM-DD" strings meant in local time like every other date in this
- * app. It's the same local-day helper `lib/attendance.js` already uses and
- * already has a test pinning its behaviour down — reusing it here instead of
- * a second hand-rolled version is one less place this exact bug can recur.
- */
 async function onLeaveToday() {
   const today = toDate();
   const rows = await Leave.find(
@@ -44,7 +25,6 @@ const PERIODS = [
   "14:00 – 14:55",
 ];
 
-/** Slot documents → the `timetable[day][periodIndex]` shape the grid renders. */
 function toGrid(slots) {
   const grid = Object.fromEntries(DAYS.map((d) => [d, PERIODS.map(() => null)]));
   for (const slot of slots) {
@@ -59,10 +39,6 @@ function toGrid(slots) {
   return grid;
 }
 
-/**
- * Reassigns the slots of unavailable teachers to a colleague free in that slot,
- * mirroring the rebuild the admin timetable page performs client-side.
- */
 function restaff(grid, unavailable, availability) {
   const out = {};
   for (const day of DAYS) {
@@ -80,7 +56,6 @@ function restaff(grid, unavailable, availability) {
   return out;
 }
 
-/** Rows for the "what changed" table under the grid. */
 function changeList(grid) {
   return DAYS.flatMap((day) =>
     grid[day]
@@ -101,11 +76,6 @@ function changeList(grid) {
   );
 }
 
-/**
- * GET /api/timetable?scope=master&unavailable=A,B
- * Returns days, periods and the grid — already re-staffed around anyone
- * unavailable (teachers on approved leave are included automatically).
- */
 router.get(
   "/",
   route(async (req, res) => {
@@ -137,13 +107,6 @@ router.get(
   }),
 );
 
-/**
- * POST /api/timetable/rebuild — the "Rebuild · v{n}" button.
- *
- * Only the version is persisted. Substitution stays a read-time computation so
- * the canonical assignment survives: when a teacher comes back off leave their
- * slots are theirs again, which overwriting `faculty` here would make impossible.
- */
 router.post(
   "/rebuild",
   route(async (req, res) => {
@@ -174,7 +137,6 @@ router.post(
   }),
 );
 
-/** PUT /api/timetable/slot — place or clear a single cell. */
 router.put(
   "/slot",
   route(async (req, res) => {

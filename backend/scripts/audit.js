@@ -1,7 +1,3 @@
-/**
- * Prints every consistency finding. `npm run audit`
- * Add --fix to realign stored attendance percentages with the register.
- */
 const connectDB = require("../db/connection");
 const { disconnectDB } = require("../db/connection");
 const { checkConsistency } = require("../lib/consistency");
@@ -17,7 +13,6 @@ const Admission = require("../models/Admission");
     console.log(`Reconciled ${changed.length} attendance percentage(s)`);
     changed.forEach((c) => console.log(`   ${c.holderId} ${c.name}: ${c.from}% -> ${c.to}%`));
 
-    // A seat marked paid must have a student behind it.
     const unissued = await Admission.find({ feeStatus: "Paid", studentId: "" });
     for (const admission of unissued) {
       const { studentId, email, password } = await enrolFromAdmission(admission);

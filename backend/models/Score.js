@@ -12,7 +12,6 @@ const ScoreSchema = schema({
   grade: { type: String, default: "—" },
 });
 
-/** A student holds one score per course per exam. */
 ScoreSchema.index({ id: 1, course: 1, exam: 1 }, { unique: true });
 
 module.exports = mongoose.model("Score", ScoreSchema);

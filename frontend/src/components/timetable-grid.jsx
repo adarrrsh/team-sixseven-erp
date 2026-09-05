@@ -1,6 +1,5 @@
 import { cn } from "cn"
 
-/** Fallbacks for when the grid renders before the API response lands. */
 const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 const DEFAULT_PERIODS = [
   "09:00 – 09:55",
@@ -17,13 +16,6 @@ const CODE_TONE = {
   CM: "bg-red-strong text-white",
 }
 
-/**
- * One grid, three audiences: pass `show="faculty"` for the teacher view and
- * `highlight` to dim everything except one teacher's slots.
- *
- * `days` and `periods` come from the timetable endpoint; they fall back to the
- * institute's standard week so the shell can render while the data loads.
- */
 export function TimetableGrid({
   data,
   days = DEFAULT_DAYS,

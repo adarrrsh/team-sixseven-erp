@@ -15,13 +15,6 @@ const router = express.Router();
 const reference = () =>
   "PAY-" + crypto.randomBytes(4).toString("hex").slice(0, 5).toUpperCase();
 
-/**
- * POST /api/payments/admission — the seat fee for an approved application.
- *
- * Payment is refused until the registrar has approved, and is idempotent once
- * paid. Clearing the fee confirms the seat: it enrols the student, issues a
- * randomly generated login, and records the id back on the application.
- */
 router.post(
   "/admission",
   route(async (req, res) => {
@@ -45,7 +38,6 @@ router.post(
       );
     }
     if (admission.feeStatus === "Paid") {
-      // Already settled: hand back the same receipt rather than charging twice.
       return res.json({
         ok: true,
         alreadyPaid: true,
@@ -65,7 +57,6 @@ router.post(
     const ref = reference();
     const paidAt = new Date().toISOString();
 
-    // Enrol the student and issue their credentials.
     const { studentId, email: studentEmail, password } = await enrolFromAdmission(admission);
 
     admission.feeStatus = "Paid";
@@ -107,16 +98,11 @@ router.post(
       paidAt,
       amount: paid,
       status: "Confirmed",
-      // Shown to the applicant once, on the confirmation screen.
       credentials: { studentId, email: studentEmail, password, portal: "/student" },
     });
   }),
 );
 
-/**
- * POST /api/payments/student — semester fees and fines from the student portal.
- * Settles the matching fee head or fine and keeps the student's balances in step.
- */
 router.post(
   "/student",
   route(async (req, res) => {
@@ -138,7 +124,6 @@ router.post(
       await fee.save();
       student.feesDue = Math.max(0, student.feesDue - paid);
     } else {
-      // No matching fee head — treat it as settling outstanding fines.
       const unpaid = await Fine.find({
         status: "Unpaid",
         $or: [{ studentId }, { student: student.name }],
@@ -180,7 +165,6 @@ router.post(
   }),
 );
 
-/** GET /api/payments?kind=&studentId= — the gateway ledger. */
 router.get(
   "/",
   route(async (req, res) => {
@@ -192,7 +176,6 @@ router.get(
   }),
 );
 
-/** GET /api/payments/:reference — look up a single receipt. */
 router.get(
   "/:reference",
   route(async (req, res) => {

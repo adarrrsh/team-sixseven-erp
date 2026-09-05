@@ -9,7 +9,6 @@ const router = express.Router();
 
 const clampMarks = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
-/** GET /api/scores?exam=&course=&id=&program= */
 router.get(
   "/",
   route(async (req, res) => {
@@ -23,7 +22,6 @@ router.get(
   }),
 );
 
-/** GET /api/scores/by-course — course averages behind the score chart. */
 router.get(
   "/by-course",
   route(async (_req, res) => {
@@ -35,7 +33,6 @@ router.get(
   }),
 );
 
-/** GET /api/scores/stats — records, average, distinctions, below pass. */
 router.get(
   "/stats",
   route(async (_req, res) => {
@@ -55,7 +52,6 @@ router.get(
   }),
 );
 
-/** POST /api/scores — publish a mark; upserts on (student, course, exam). */
 router.post(
   "/",
   route(async (req, res) => {
@@ -84,10 +80,6 @@ router.post(
   }),
 );
 
-/**
- * PATCH /api/scores/:key — update marks. `key` is either the `recordId` a row
- * carries or a `studentId::course` pair, since scores key on (student, course).
- */
 router.patch(
   "/:key",
   route(async (req, res) => {

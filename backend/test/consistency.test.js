@@ -5,13 +5,6 @@ const connectDB = require("../db/connection");
 const { disconnectDB } = require("../db/connection");
 const { checkConsistency } = require("../lib/consistency");
 
-/**
- * Read-only invariants over whatever is actually in the database.
- *
- * These are the rules that, when broken, show up as two screens disagreeing
- * about the same student — so each one is asserted separately to say plainly
- * which invariant failed.
- */
 test("database consistency", async (t) => {
   await connectDB();
   const issues = await checkConsistency();

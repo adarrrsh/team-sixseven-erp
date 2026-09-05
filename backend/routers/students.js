@@ -11,9 +11,6 @@ const router = express.Router();
 
 const WRITABLE = ["name", "program", "sem", "dept", "attendance", "cgpa", "feesDue", "fines", "email", "phone", "guardian", "status"];
 
-/* ---- collections that must resolve before the /:id route ---- */
-
-/** GET /api/students/fees?status=&id= — semester fee ledger. */
 router.get(
   "/fees",
   route(async (req, res) => {
@@ -24,7 +21,6 @@ router.get(
   }),
 );
 
-/** GET /api/students/fines?status=&student= */
 router.get(
   "/fines",
   route(async (req, res) => {
@@ -36,7 +32,6 @@ router.get(
   }),
 );
 
-/** POST /api/students/fines — raise a fine against a student. */
 router.post(
   "/fines",
   route(async (req, res) => {
@@ -59,7 +54,6 @@ router.post(
   }),
 );
 
-/** PATCH /api/students/fines/:id/settle — the "Settle" button. */
 router.patch(
   "/fines/:id/settle",
   route(async (req, res) => {
@@ -72,7 +66,6 @@ router.patch(
   }),
 );
 
-/** GET /api/students/stats — the cards above the student tables. */
 router.get(
   "/stats",
   route(async (_req, res) => {
@@ -100,9 +93,6 @@ router.get(
   }),
 );
 
-/* ---- the roll itself ---- */
-
-/** GET /api/students?dept=&program=&sem=&status=&q= */
 router.get(
   "/",
   route(async (req, res) => {
@@ -117,7 +107,6 @@ router.get(
   }),
 );
 
-/** POST /api/students — "Add a student". */
 router.post(
   "/",
   route(async (req, res) => {
@@ -141,7 +130,6 @@ router.get(
   }),
 );
 
-/** GET /api/students/:id/profile — everything the student portal renders at once. */
 router.get(
   "/:id/profile",
   route(async (req, res) => {
@@ -173,7 +161,6 @@ router.patch(
   }),
 );
 
-/** PATCH /api/students/:id/attendance — the faculty roll-call buttons. */
 router.patch(
   "/:id/attendance",
   route(async (req, res) => {

@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const { schema } = require("../lib/schema");
 
-/** Ledger for the dummy gateway — admission fees, semester fees and fines. */
 const PaymentSchema = schema({
   reference: { type: String, required: true, unique: true, index: true },
   kind: { type: String, enum: ["admission", "student"], required: true, index: true },

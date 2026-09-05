@@ -10,9 +10,6 @@ const router = express.Router();
 
 const WRITABLE = ["name", "dept", "subject", "email", "phone", "exp", "salary", "attendance", "load", "status", "free"];
 
-/* ---- collections that must resolve before the /:id route ---- */
-
-/** GET /api/faculty/leaves?status= — leave requests queue. */
 router.get(
   "/leaves",
   route(async (req, res) => {
@@ -24,7 +21,6 @@ router.get(
   }),
 );
 
-/** POST /api/faculty/leaves — "Apply for leave" in the faculty portal. */
 router.post(
   "/leaves",
   route(async (req, res) => {
@@ -52,7 +48,6 @@ router.post(
   }),
 );
 
-/** PATCH /api/faculty/leaves/:id/status — Approve / Reject. */
 router.patch(
   "/leaves/:id/status",
   route(async (req, res) => {
@@ -63,7 +58,6 @@ router.patch(
     const row = await Leave.findOneAndUpdate({ id: req.params.id }, { status }, { new: true });
     if (!row) throw notFound("Leave request");
 
-    // An approved leave puts the teacher on leave, so the timetable can route around them.
     if (status === "Approved") await Faculty.updateOne({ name: row.name }, { status: "On leave" });
     if (status === "Rejected") await Faculty.updateOne({ name: row.name }, { status: "Active" });
 
@@ -71,7 +65,6 @@ router.patch(
   }),
 );
 
-/** GET /api/faculty/salaries?month= — payroll register. */
 router.get(
   "/salaries",
   route(async (req, res) => {
@@ -82,7 +75,6 @@ router.get(
   }),
 );
 
-/** PATCH /api/faculty/salaries/:id/status?month= — release or hold a payout. */
 router.patch(
   "/salaries/:id/status",
   route(async (req, res) => {
@@ -98,7 +90,6 @@ router.patch(
   }),
 );
 
-/** GET /api/faculty/attendance — trend series plus the per-teacher figures. */
 router.get(
   "/attendance",
   route(async (_req, res) => {
@@ -113,7 +104,6 @@ router.get(
   }),
 );
 
-/** GET /api/faculty/availability — free slots that drive timetable regeneration. */
 router.get(
   "/availability",
   route(async (_req, res) => {
@@ -122,7 +112,6 @@ router.get(
   }),
 );
 
-/** GET /api/faculty/duties — invigilator duty assignment board. */
 router.get(
   "/duties",
   route(async (_req, res) => {
@@ -130,7 +119,6 @@ router.get(
   }),
 );
 
-/** PATCH /api/faculty/duties/:examId — assign an invigilator to an exam. */
 router.patch(
   "/duties/:examId",
   route(async (req, res) => {
@@ -146,9 +134,6 @@ router.patch(
   }),
 );
 
-/* ---- the directory itself ---- */
-
-/** GET /api/faculty?dept=&status=&q= — searchable teacher directory. */
 router.get(
   "/",
   route(async (req, res) => {
@@ -161,7 +146,6 @@ router.get(
   }),
 );
 
-/** POST /api/faculty — "Add a teacher". */
 router.post(
   "/",
   route(async (req, res) => {

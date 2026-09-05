@@ -18,18 +18,10 @@ import {
 import { useApi, useApiAll } from "@/lib/use-api"
 import { getAttendanceHistory, getAttendanceSummary, getAttendanceTrend } from "@/lib/api"
 
-/** The institute requires 75% to sit exams. */
 const THRESHOLD = 75
 
 const tone = (pct) => (pct >= 85 ? "green" : pct >= THRESHOLD ? "pink" : "red")
 
-/**
- * Attendance over time for a whole cohort: turnout trend, per-person totals and
- * a drill-down into anyone's day-by-day record.
- *
- * Everything here is derived from the same register the RFID readers write, so
- * the figures match what the gates recorded.
- */
 export function AttendanceTracker({ holderType = "student" }) {
   const [openFor, setOpenFor] = useState(null)
 
@@ -168,7 +160,6 @@ export function AttendanceTracker({ holderType = "student" }) {
   )
 }
 
-/** Day-by-day record for one person, loaded when the dialog opens. */
 function HistoryDialog({ row, holderType, onClose }) {
   const { data, loading, error, refresh } = useApi(
     () => (row ? getAttendanceHistory(row.holderId, holderType) : Promise.resolve(null)),

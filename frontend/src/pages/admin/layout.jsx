@@ -30,7 +30,6 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const session = loadSession()
 
-  // Whoever actually signed in on the login page — not a stand-in name.
   useEffect(() => {
     if (!session || session.role !== "admin") navigate("/", { replace: true })
   }, [session, navigate])

@@ -3,12 +3,6 @@ import ForceGraph2D from "react-force-graph-2d"
 import { forceCollide } from "d3-force-3d"
 import { cn } from "cn"
 
-/**
- * Bright, glow-friendly hues for a near-black canvas — deliberately more
- * saturated than the site's normal palette, which is tuned for white
- * surfaces. `me` gets its own warm accent so the centre of the graph always
- * reads clearly.
- */
 const GLOW = {
   me: "#f6c343",
   course: "#5b9dff",
@@ -20,7 +14,6 @@ const BG = "#0b0b10"
 const LINK_COLOR = "rgba(255,255,255,0.16)"
 const PARTICLE_COLOR = "rgba(255,255,255,0.85)"
 
-/** Tracks an element's rendered box — the canvas needs real pixel dimensions, not just a CSS width. */
 function useContainerSize() {
   const ref = useRef(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -38,32 +31,14 @@ function useContainerSize() {
   return [ref, size]
 }
 
-/**
- * An Obsidian-style "graph view": nodes held apart by charge and pulled
- * together by their links, glowing on a dark canvas, with particles
- * animating along every edge. The physics, drag, zoom and pan all come from
- * `react-force-graph-2d` (force-graph + d3-force under the hood) — only the
- * colours, glow and the recentre control are custom.
- *
- * nodes: [{ id, label, group, val? }]  — group keys into `GLOW`
- * links: [{ source, target }]          — ids matching a node's `id`
- */
 export function KnowledgeGraph({ nodes, links, height = 420, className }) {
   const [containerRef, size] = useContainerSize()
   const fgRef = useRef(null)
   const data = useMemo(() => ({ nodes, links }), [nodes, links])
 
-  // Small graphs (a handful of nodes) settle into a cramped clump under
-  // force-graph's defaults, which were tuned for much bigger ones — push
-  // the charge and link-distance forces out so labels stay legible, then
-  // let the simulation settle and frame the whole graph. Re-runs whenever
-  // the underlying data changes (a fresh poll, a tab switch).
   useEffect(() => {
     fgRef.current?.d3Force("charge")?.strength(-220)
     fgRef.current?.d3Force("link")?.distance(110)
-    // Without this, small graphs can settle with one node's centre sitting
-    // exactly on another's — a plain repulsion force pushes nodes apart but
-    // never guarantees their glow circles stop overlapping outright.
     fgRef.current?.d3Force("collide", forceCollide((n) => (n.val ?? 3) * 5))
     const timer = setTimeout(() => fgRef.current?.zoomToFit(600, 64), 450)
     return () => clearTimeout(timer)
@@ -98,10 +73,6 @@ export function KnowledgeGraph({ nodes, links, height = 420, className }) {
             fgRef.current?.zoom(3, 500)
           }}
           nodeCanvasObject={(node, ctx, globalScale) => {
-            // Before the simulation's first tick, a node's x/y are still
-            // unset — skip that frame rather than hand the canvas API a
-            // non-finite coordinate (it throws, which stops the whole
-            // animation loop dead).
             if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return
 
             const color = GLOW[node.group] ?? "#9ca3af"

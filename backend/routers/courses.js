@@ -6,7 +6,6 @@ const router = express.Router();
 
 const WRITABLE = ["title", "dept", "credits", "faculty", "enrolled", "sem"];
 
-/** GET /api/courses?dept=&sem=&q= */
 router.get(
   "/",
   route(async (req, res) => {

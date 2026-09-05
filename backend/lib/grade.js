@@ -1,4 +1,3 @@
-/** Mirrors the grade bands the admin score page renders. */
 function grade(marks) {
   if (marks >= 90) return "A+";
   if (marks >= 80) return "A";

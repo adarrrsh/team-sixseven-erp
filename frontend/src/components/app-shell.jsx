@@ -29,16 +29,6 @@ function NavItem({ to, icon: Icon, label, end, onClick, className }) {
   )
 }
 
-/**
- * Shared chrome for all three portals: one fixed, pilled navbar up top —
- * brand mark, section links, identity + sign-out — and nothing else. No
- * separate top bar, no side rail. Below `lg` the links *and* the sign-out
- * button collapse behind a menu toggle (the pill itself would otherwise
- * have to scroll sideways to fit every section), opening a dropdown under
- * the pill; the bar itself stretches to fill the available width there
- * instead of shrinking to a tight cluster around the logo. Page content
- * fades in on mount only.
- */
 export function AppShell({ user, nav, children }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -46,17 +36,11 @@ export function AppShell({ user, nav, children }) {
   const [openedAt, setOpenedAt] = useState(location.pathname)
   const links = nav.filter((item) => !item.heading)
 
-  // Without this, the stored session outlives the portal: opening the site
-  // fresh afterwards would silently sign back in as whoever last signed out.
   const signOut = () => {
     clearSession()
     navigate("/")
   }
 
-  // A route change means a link was just taken (or "Sign out" was hit) —
-  // either way the mobile menu should close behind it. Adjusted during
-  // render (React's recommended way to reset state on a prop change)
-  // rather than in an effect, so it takes effect in the same commit.
   if (location.pathname !== openedAt) {
     setOpenedAt(location.pathname)
     setOpen(false)

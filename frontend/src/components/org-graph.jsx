@@ -23,7 +23,6 @@ const TONE = {
   dark: "border-foreground bg-foreground text-background",
 }
 
-/** Same four hues as the wires — every pill in the tree is solid, no neutrals. */
 const TIER = {
   institute: { y: 0, tone: "pink", label: "Institute" },
   department: { y: 145, tone: "blue", label: "Department" },
@@ -31,7 +30,6 @@ const TIER = {
   course: { y: 435, tone: "green", label: "Course" },
 }
 
-/** Wire colour and its flowing-dot fill, keyed by the *source* node's tier tone. */
 const EDGE_COLOR = {
   pink: "var(--pink-strong)",
   blue: "var(--blue-strong)",
@@ -66,14 +64,6 @@ function FlowNode({ data }) {
 
 const nodeTypes = { erp: FlowNode }
 
-/**
- * A structured bezier wire — curved, but anchored to the same top/bottom
- * handles as every other edge, so a tree of them still reads as a tidy
- * hierarchy rather than a tangle. A handful of dots travel the exact same
- * path via the CSS motion-path API, each started mid-cycle with a negative
- * `animation-delay` so they appear evenly spaced and already in motion on
- * first paint (no flash-then-jump at edge start).
- */
 function FlowEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data, markerEnd }) {
   const [edgePath] = getBezierPath({
     sourceX,
@@ -110,15 +100,6 @@ function FlowEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targ
 
 const edgeTypes = { flow: FlowEdge }
 
-/**
- * A true centred-tree layout, not just a row-per-tier grid: each node's x is
- * the midpoint of its own children's x, and children get sequential,
- * contiguous leaf slots under their parent. That ordering guarantees two
- * wires can never cross — a tier's left-to-right order always matches its
- * parents' order one level up, so no child ever has to reach sideways past
- * a sibling subtree to find its parent. y still comes from the fixed tier
- * row (institute/department/faculty/course) so the tree reads top-down.
- */
 function layout(nodes, edges) {
   const childrenOf = new Map()
   const hasParent = new Set()
@@ -163,13 +144,6 @@ function layout(nodes, edges) {
   })
 }
 
-/**
- * Flagship view: the whole institute as a live graph, read from the backend
- * and re-synced every `POLL_MS` so admissions, new hires or new courses show
- * up without a manual refresh. A poll only ever adds, drops or relabels
- * nodes — any node that's still present keeps wherever it was dragged to,
- * so the graph doesn't jump around under someone mid-explore.
- */
 export function OrgGraph({ height = 520 }) {
   const { data, error, loading, refresh } = useApi(
     () => getOrgGraph(),
@@ -180,8 +154,6 @@ export function OrgGraph({ height = 520 }) {
 
   const computedNodes = useMemo(() => layout(data.nodes, data.edges), [data.nodes, data.edges])
 
-  // Colour each wire by the tier it leaves from (institute -> department
-  // edges are pink, department -> faculty blue, and so on).
   const nodeTone = useMemo(
     () => new Map(computedNodes.map((n) => [n.id, n.data.tone])),
     [computedNodes],
@@ -199,9 +171,6 @@ export function OrgGraph({ height = 520 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges)
 
-  // Merge each fresh graph into the canvas: nodes that already exist keep
-  // their current (possibly dragged) position, new ones get the computed
-  // layout slot, and anything gone from the response drops off the canvas.
   useEffect(() => {
     setNodes((current) => {
       const prevPosition = new Map(current.map((n) => [n.id, n.position]))

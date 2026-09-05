@@ -23,7 +23,6 @@ import { clearSession, loadSession } from "@/lib/session"
 import { inr } from "@/lib/utils"
 import { cn } from "cn"
 
-/** How often the portal re-checks for the registrar's decision. */
 const POLL_MS = 5000
 
 export default function ApplicantPortal() {
@@ -40,7 +39,6 @@ export default function ApplicantPortal() {
     null,
   )
 
-  // A decision made in the admin console lands here without a manual refresh.
   useEffect(() => {
     if (data?.stage === "confirmed" || data?.stage === "rejected") return
     const timer = setInterval(refresh, POLL_MS)
@@ -90,7 +88,6 @@ export default function ApplicantPortal() {
   )
 }
 
-/** One card per lifecycle stage — the backend decides which one applies. */
 function Stage({ data, onPaid }) {
   const { stage, application } = data
 
@@ -104,7 +101,6 @@ function Stage({ data, onPaid }) {
   return <UnderReview application={application} />
 }
 
-/** Static so Tailwind's scanner can see every class it needs to emit. */
 const TONE = {
   pink: "bg-pink-soft text-pink-strong",
   green: "bg-green-soft text-green-strong",
@@ -178,7 +174,6 @@ function UnderReview({ application }) {
   )
 }
 
-/** A rejected applicant sees this and nothing else. */
 function Rejected({ application }) {
   return (
     <Shell
@@ -210,7 +205,6 @@ function AwaitingPayment({ application, onPaid }) {
     setError(null)
     try {
       const receipt = await payAdmissionFee({ applicationId: application.id })
-      // Re-render straight into the confirmed stage with the issued login.
       onPaid({
         stage: "confirmed",
         application: {

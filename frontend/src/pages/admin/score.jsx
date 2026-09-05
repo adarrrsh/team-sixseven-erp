@@ -40,7 +40,6 @@ export default function ScorePage() {
   const [busy, setBusy] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
-  /** The backend clamps to 0–100 and derives the grade, so trust what it returns. */
   const save = async () => {
     setBusy(true)
     setSaveError(null)
@@ -51,7 +50,7 @@ export default function ScorePage() {
         rows: d.rows.map((r) => (r.id === updated.id && r.course === updated.course ? updated : r)),
       }))
       setEditing(null)
-      refresh() // the stat cards and by-course chart are server-aggregated — pull them fresh too
+      refresh()
     } catch (err) {
       setSaveError(err)
     } finally {

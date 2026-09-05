@@ -15,18 +15,9 @@ import { cn } from "cn"
 export default function AdminTimetable() {
   const [unavailable, setUnavailable] = useState([])
   const [rebuilding, setRebuilding] = useState(false)
-  // Single-select — a distinct concern from `unavailable` above (which marks
-  // several teachers off for the rebuild). Picking a teacher here just
-  // filters the Teacher view tab down to their own schedule; picking
-  // another replaces the selection rather than adding to it.
   const [viewing, setViewing] = useState(null)
   const [tab, setTab] = useState("student")
 
-  /**
-   * The backend re-staffs the grid: it folds anyone on approved leave into the
-   * unavailable list, finds a colleague free in that slot, and returns both the
-   * resulting grid and the list of changes.
-   */
   const { data, error, loading, setData, refresh } = useApiAll(
     {
       grid: () => getTimetable({ unavailable: unavailable.join(",") }),
@@ -40,7 +31,6 @@ export default function AdminTimetable() {
   const grid = data.grid?.timetable
   const changes = data.grid?.changes ?? []
   const version = data.grid?.version ?? 1
-  // Includes teachers the server marked unavailable because their leave was approved.
   const effectiveUnavailable = data.grid?.unavailable ?? unavailable
 
   const toggle = (name) =>

@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const { schema } = require("../lib/schema");
 
-/** Chart series — facultyAttendanceTrend, feeCollectionTrend, and friends. */
 const MetricSchema = schema({
   series: { type: String, required: true, index: true },
   label: { type: String, required: true },

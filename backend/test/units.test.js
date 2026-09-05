@@ -5,8 +5,6 @@ const { grade } = require("../lib/grade");
 const { normaliseUid } = require("../lib/uid");
 const { toDate } = require("../lib/attendance");
 
-/* These are pure functions the whole system leans on, so they get pinned down. */
-
 test("grade bands match the ones the score page renders", () => {
   assert.equal(grade(100), "A+");
   assert.equal(grade(90), "A+");

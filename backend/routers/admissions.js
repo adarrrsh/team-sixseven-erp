@@ -7,7 +7,6 @@ const router = express.Router();
 
 const WRITABLE = ["name", "program", "score", "applied", "fee", "status", "email", "phone"];
 
-/** GET /api/admissions?status=Pending&program=&q= */
 router.get(
   "/",
   route(async (req, res) => {
@@ -20,7 +19,6 @@ router.get(
   }),
 );
 
-/** GET /api/admissions/stats — the three cards above the admissions tabs. */
 router.get(
   "/stats",
   route(async (_req, res) => {
@@ -34,7 +32,6 @@ router.get(
   }),
 );
 
-/** GET /api/admissions/fees — the admission fee tracker. */
 router.get(
   "/fees",
   route(async (req, res) => {
@@ -52,7 +49,6 @@ router.get(
   }),
 );
 
-/** POST /api/admissions — a new application from the /apply flow. */
 router.post(
   "/",
   route(async (req, res) => {
@@ -69,7 +65,6 @@ router.post(
   }),
 );
 
-/** PATCH /api/admissions/:id/status — the Approve / Reject buttons. */
 router.patch(
   "/:id/status",
   route(async (req, res) => {
@@ -81,7 +76,6 @@ router.patch(
     const existing = await Admission.findOne({ id: req.params.id });
     if (!existing) throw notFound("Admission");
 
-    // Once the seat fee has cleared the student is enrolled; the decision stands.
     if (existing.feeStatus === "Paid" && status !== existing.status) {
       throw badRequest(
         "This seat is already confirmed and paid for — the decision cannot be changed",

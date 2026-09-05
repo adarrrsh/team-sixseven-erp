@@ -13,7 +13,6 @@ const FacultySchema = schema({
   attendance: { type: Number, default: 100 },
   load: { type: Number, default: 0 },
   status: { type: String, enum: ["Active", "On leave", "Inactive"], default: "Active" },
-  /** Free slots, e.g. ["Mon P3", "Tue P2"] — drives timetable regeneration. */
   free: { type: [String], default: [] },
 });
 

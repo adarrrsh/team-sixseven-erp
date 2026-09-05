@@ -7,10 +7,6 @@ const FILL = {
   blue: "var(--blue)",
 }
 
-/**
- * Small dependency-free bar chart — rounded bars, one flat colour.
- * data: [{ label, value }], values are 0–max.
- */
 export function BarChart({ data, max = 100, tone = "pink", suffix = "%", className, height = 168 }) {
   const fill = FILL[tone]
   return (
@@ -43,18 +39,12 @@ export function BarChart({ data, max = 100, tone = "pink", suffix = "%", classNa
   )
 }
 
-/**
- * Small dependency-free line/area chart — a solid stroke over a flat, low-
- * opacity fill (no gradients). Reads better than a bar chart for anything
- * that's a trend over time rather than a comparison across categories.
- * data: [{ label, value }].
- */
 export function LineChart({ data, max, tone = "pink", suffix = "%", className, height = 168 }) {
   const fill = FILL[tone]
   const top = max ?? Math.max(...data.map((d) => d.value), 1)
   const n = data.length
   const stepX = n > 1 ? 100 / (n - 1) : 0
-  const pad = 12 // vertical padding inside the viewBox so dots/labels never clip
+  const pad = 12
   const yFor = (v) => pad + (1 - Math.min(v, top) / top) * (100 - pad * 2)
   const points = data.map((d, i) => [n > 1 ? i * stepX : 50, yFor(d.value)])
   const linePath = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ")
@@ -102,17 +92,11 @@ export function LineChart({ data, max, tone = "pink", suffix = "%", className, h
   )
 }
 
-/**
- * Ring breakdown — same data shape as `SplitBars` (label/value/tone), read
- * as a proportion at a glance instead of a linear split.
- */
 export function DonutChart({ data, size = 168, thickness = 22, centerLabel, centerValue, className }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1
   const r = 50 - thickness / 2
   const circumference = 2 * Math.PI * r
 
-  // Each segment's offset is the running length of every segment before it —
-  // built functionally (no mutation during render) via reduce.
   const segments = data.reduce((rows, d) => {
     const dash = (d.value / total) * circumference
     const offset = rows.length ? rows.at(-1).offset + rows.at(-1).dash : 0
@@ -158,7 +142,6 @@ export function DonutChart({ data, size = 168, thickness = 22, centerLabel, cent
   )
 }
 
-/** Single-value radial progress ring — a focal number with its share filled in. */
 export function RadialGauge({ value, max = 100, tone = "pink", suffix = "%", label, size = 168, thickness = 14, className }) {
   const r = 50 - thickness / 2
   const circumference = 2 * Math.PI * r
@@ -196,7 +179,6 @@ export function RadialGauge({ value, max = 100, tone = "pink", suffix = "%", lab
   )
 }
 
-/** Horizontal breakdown bars — used for department / fee splits. */
 export function SplitBars({ data, className }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1
   return (

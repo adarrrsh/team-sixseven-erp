@@ -1,7 +1,3 @@
-/**
- * Every table in the app can be downloaded as .csv or .xlsx.
- * `columns` is [{ key, header }]; `rows` is an array of plain objects.
- */
 
 const stamp = () => new Date().toISOString().slice(0, 10)
 

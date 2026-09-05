@@ -6,7 +6,6 @@ const { route, notFound, badRequest, HttpError, nextId } = require("../lib/http"
 
 const router = express.Router();
 
-/** Application fee by programme, mirroring the options on the apply form. */
 const PROGRAM_FEES = {
   "B.Tech CSE": 2500,
   "B.Tech ECE": 2500,
@@ -14,7 +13,6 @@ const PROGRAM_FEES = {
   "B.Com Hons": 1500,
 };
 
-/** The seat fee an approved applicant pays to confirm admission. */
 const SEAT_FEES = {
   "B.Tech CSE": 78000,
   "B.Tech ECE": 74000,
@@ -22,10 +20,6 @@ const SEAT_FEES = {
   "B.Com Hons": 52000,
 };
 
-/**
- * What the applicant portal renders, derived from the application's state so
- * the page never has to work the stage out itself.
- */
 function toStatus(admission) {
   const stage =
     admission.status === "Rejected"
@@ -39,18 +33,12 @@ function toStatus(admission) {
   return {
     stage,
     application: admission.toJSON(),
-    /** Only ever set once the seat fee has cleared. */
     credentials: admission.studentId
       ? { studentId: admission.studentId, portal: "/student" }
       : null,
   };
 }
 
-/**
- * POST /api/applicants/register — the admission form.
- * Creates the application (Pending) and the login the applicant uses to track it.
- * No payment is taken here: the fee is only payable once the registrar approves.
- */
 router.post(
   "/register",
   route(async (req, res) => {
@@ -92,7 +80,6 @@ router.post(
       linkedId: id,
     });
 
-    // The tracker row exists from the start so the registrar sees who still owes.
     await AdmissionFee.create({
       id,
       name: body.name,
@@ -106,7 +93,6 @@ router.post(
   }),
 );
 
-/** GET /api/applicants/me?email= — the applicant portal's single source of truth. */
 router.get(
   "/me",
   route(async (req, res) => {
@@ -120,7 +106,6 @@ router.get(
   }),
 );
 
-/** GET /api/applicants/fees — programme fees, so the form can price itself. */
 router.get("/fees", (_req, res) =>
   res.json(
     Object.keys(SEAT_FEES).map((program) => ({

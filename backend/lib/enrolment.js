@@ -3,7 +3,6 @@ const User = require("../models/User");
 const { nextId } = require("./http");
 const { generatePassword } = require("./credentials");
 
-/** Programmes map onto the department the admitted student joins. */
 const PROGRAM_DEPT = {
   "B.Tech CSE": "Computer Science",
   "B.Tech ECE": "Electronics",
@@ -11,7 +10,6 @@ const PROGRAM_DEPT = {
   "B.Com Hons": "Commerce",
 };
 
-/** An institute address in the house style — "aisha.s@origin.edu" — kept unique. */
 async function instituteEmail(name) {
   const [first = "student", last = ""] = String(name).toLowerCase().split(/\s+/);
   const base = last ? `${first}.${last[0]}` : first;
@@ -22,13 +20,6 @@ async function instituteEmail(name) {
   }
 }
 
-/**
- * Turns a paid admission into a student on the roll, with a login.
- *
- * The single place a seat becomes a student — used when the fee clears, and
- * again when reconciling an admission that was marked paid without one. Doing
- * it in two places is how the two ever disagreed.
- */
 async function enrolFromAdmission(admission) {
   if (admission.studentId) {
     const existing = await Student.findOne({ id: admission.studentId });

@@ -30,13 +30,6 @@ import { getAttendanceHistory, getStudentProfile, getTimetable, payStudentDue } 
 import { loadSession } from "@/lib/session"
 import { inr, pct } from "@/lib/utils"
 
-/**
- * One call returns the signed-in student plus their fees, fines, scores,
- * courses and exams — keyed on `session.linkedId`, the Student.id the
- * backend attached to this account at login. Every page below calls this
- * instead of hardcoding whose record to show, so the portal always renders
- * whoever actually signed in.
- */
 function useProfile() {
   const session = loadSession()
   const query = useApi(() => getStudentProfile(session?.linkedId), [session?.linkedId], null)
@@ -60,8 +53,6 @@ export default function StudentPortal() {
   const navigate = useNavigate()
   const session = loadSession()
 
-  // No stored session, or one that belongs to a different portal — bounce
-  // back to the login page rather than rendering someone else's data.
   useEffect(() => {
     if (!session || session.role !== "student") navigate("/", { replace: true })
   }, [session, navigate])
@@ -254,13 +245,6 @@ function MyExams() {
   )
 }
 
-/**
- * An Obsidian-style graph of my academic network, exactly two layers deep:
- * me at the centre, the courses I'm registered for one ring out, and the
- * one professor teaching each course a ring beyond that. Built entirely
- * from the profile's own `courses` list — each course already carries its
- * teaching faculty's name, so no extra fetch is needed.
- */
 function Network() {
   const { data, error, loading, refresh, session } = useProfile()
   const me = data?.student
@@ -463,7 +447,6 @@ function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant =
   const [done, setDone] = useState(null)
   const [error, setError] = useState(null)
 
-  // Omitting `head` tells the backend to settle outstanding fines instead.
   const run = async () => {
     setBusy(true)
     setError(null)
@@ -550,14 +533,6 @@ function PayDialog({ label, studentId, amount, head, onPaid, disabled, variant =
   )
 }
 
-
-/**
- * The student's own attendance tracker.
- *
- * Reads the same register the gate readers write to, so what shows here is
- * exactly what their card recorded — including whether they clear the 75%
- * threshold needed to sit exams.
- */
 function MyAttendance() {
   const session = loadSession()
   const { data, error, loading, refresh } = useApi(
@@ -569,7 +544,6 @@ function MyAttendance() {
   const percentage = data?.percentage ?? 0
   const tone = percentage >= 85 ? "green" : percentage >= 75 ? "pink" : "red"
 
-  // Consecutive days they would need to attend to climb back over 75%.
   const shortfall = data
     ? Math.max(0, Math.ceil((0.75 * data.days - data.present) / 0.25))
     : 0

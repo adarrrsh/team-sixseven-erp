@@ -22,12 +22,6 @@ import { getCards, getFaculty, getStudents, issueCard, revokeCard, setCardStatus
 
 const STATUS_TONE = { Active: "green", Lost: "red", Deactivated: "pink" }
 
-/**
- * The issued-RFID-card register for one cohort.
- *
- * A card only opens the attendance register while it is Active, so reporting
- * one lost here stops it at the gate immediately without losing its history.
- */
 export function CardRegistry({ holderType = "student" }) {
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
@@ -146,7 +140,6 @@ function IssueCard({ people, holderType, onIssued, onError }) {
   const submit = async () => {
     setBusy(true)
     try {
-      // Separators are normalised server-side, so "9C FE 1A 4A" is fine as typed.
       await issueCard({ cardId, holderType, holderId: holderId || people[0]?.id })
       setCardId("")
       setHolderId("")

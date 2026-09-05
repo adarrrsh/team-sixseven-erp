@@ -21,12 +21,6 @@ import {
 import { download } from "@/lib/export"
 import { cn } from "cn"
 
-/**
- * columns: [{ key, header, render?, align? }]
- * Search spans every column key. Every table exports to .csv / .xlsx.
- * Pass `onRowClick(row)` to make every row navigable — it gets a pointer
- * cursor on top of the row hover already built into `TableRow`.
- */
 export function DataTable({
   name,
   columns,

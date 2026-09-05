@@ -3,13 +3,6 @@ const assert = require("node:assert/strict");
 
 const BASE = process.env.TEST_API_BASE ?? "http://localhost:8000";
 
-/**
- * Contract tests against a running server. Every case here is read-only or a
- * rejected write, so running the suite never alters the register.
- *
- * Skipped automatically when nothing is listening, so `npm test` still works
- * without a server up.
- */
 const reachable = () =>
   fetch(`${BASE}/api/students`, { signal: AbortSignal.timeout(1500) })
     .then((r) => r.ok)

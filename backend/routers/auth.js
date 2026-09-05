@@ -4,7 +4,6 @@ const { route, badRequest, HttpError } = require("../lib/http");
 
 const router = express.Router();
 
-/** POST /api/auth/login — the sign-in form on the login page. */
 router.post(
   "/login",
   route(async (req, res) => {
@@ -23,7 +22,6 @@ router.post(
   }),
 );
 
-/** GET /api/auth/me?email= — resolves the signed-in identity for a portal. */
 router.get(
   "/me",
   route(async (req, res) => {

@@ -7,7 +7,6 @@ const router = express.Router();
 
 const WRITABLE = ["title", "program", "date", "slot", "room", "invigilator", "students", "status"];
 
-/** GET /api/exams?status=&program= — the exam register and its history tab. */
 router.get(
   "/",
   route(async (req, res) => {
@@ -19,7 +18,6 @@ router.get(
   }),
 );
 
-/** POST /api/exams — "Create exam". */
 router.post(
   "/",
   route(async (req, res) => {
@@ -44,7 +42,6 @@ router.get(
   }),
 );
 
-/** GET /api/exams/:id/scores — the marks sheet for one exam. */
 router.get(
   "/:id/scores",
   route(async (req, res) => {
@@ -67,7 +64,6 @@ router.patch(
   }),
 );
 
-/** DELETE /api/exams/:id — the destructive row button on the register. */
 router.delete(
   "/:id",
   route(async (req, res) => {

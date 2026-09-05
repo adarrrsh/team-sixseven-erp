@@ -9,11 +9,6 @@ const { syncPercentage, reconcileAll, toDate, modelFor } = require("../lib/atten
 
 const router = express.Router();
 
-/**
- * Readers are unattended devices on the campus network, so when
- * RFID_DEVICE_KEY is configured every scan must carry it as `x-device-key`.
- * Left unset (development), scans are accepted unauthenticated.
- */
 function authoriseReader(req) {
   const expected = process.env.RFID_DEVICE_KEY;
   if (!expected) return;
@@ -22,18 +17,6 @@ function authoriseReader(req) {
   }
 }
 
-/**
- * POST /api/attendance/rfid — the endpoint the card readers post to.
- *
- * Body: { cardId, scannedAt?, reader? }
- *   cardId    the UID read off the card
- *   scannedAt device clock, ISO 8601 (defaults to server time)
- *   reader    optional identifier of the gate or classroom
- *
- * Matches the card against the register and marks its holder present for that
- * day. Re-tapping the same card that day is idempotent: it updates `lastSeen`
- * and the scan count, and never marks a second day.
- */
 router.post(
   "/rfid",
   route(async (req, res) => {
@@ -49,7 +32,6 @@ router.post(
       throw new HttpError(403, `Card ${uid} is ${card.status.toLowerCase()} and cannot be used`);
     }
 
-    // The device supplies the moment of the tap; the server records when it arrived.
     const date = toDate(scannedAt);
     if (!date) throw badRequest("scannedAt must be a valid ISO 8601 date-time");
     const seenAt = scannedAt ? new Date(scannedAt).toISOString() : new Date().toISOString();
@@ -120,7 +102,6 @@ router.post(
   }),
 );
 
-/** GET /api/attendance?date=&holderType=&holderId=&status=&q= — the day register. */
 router.get(
   "/",
   route(async (req, res) => {
@@ -136,7 +117,6 @@ router.get(
   }),
 );
 
-/** GET /api/attendance/today — everyone seen so far today. */
 router.get(
   "/today",
   route(async (_req, res) => {
@@ -151,10 +131,6 @@ router.get(
   }),
 );
 
-/**
- * GET /api/attendance/summary?holderType= — one row per person: days present,
- * days absent and the percentage those work out to. Backs the tracker table.
- */
 router.get(
   "/summary",
   route(async (req, res) => {
@@ -189,10 +165,6 @@ router.get(
   }),
 );
 
-/**
- * GET /api/attendance/trend?holderType=&days=  — cohort turnout per day, as a
- * percentage, oldest first. Shaped for the chart components.
- */
 router.get(
   "/trend",
   route(async (req, res) => {
@@ -217,7 +189,6 @@ router.get(
         .reverse()
         .map((r) => ({
           date: r._id,
-          // "05 Sep" reads better on an axis than the full date.
           label: new Date(r._id + "T00:00:00").toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -230,11 +201,6 @@ router.get(
   }),
 );
 
-/**
- * GET /api/attendance/history/:holderId?holderType=&days=
- * One person's register with the figures a profile page shows: totals, the
- * percentage, their current run of present days, and the day-by-day record.
- */
 router.get(
   "/history/:holderId",
   route(async (req, res) => {
@@ -250,7 +216,6 @@ router.get(
     const present = records.filter((r) => r.status === "Present").length;
     const days = records.length;
 
-    // Consecutive present days counting back from the most recent record.
     let streak = 0;
     for (const record of records) {
       if (record.status !== "Present") break;
@@ -264,7 +229,6 @@ router.get(
       absent: days - present,
       percentage: days ? Math.round((present / days) * 100) : 0,
       streak,
-      /** The institute needs 75% to sit exams. */
       eligible: days ? Math.round((present / days) * 100) >= 75 : true,
       trend: records
         .slice(0, 30)
@@ -282,12 +246,6 @@ router.get(
   }),
 );
 
-/**
- * POST /api/attendance/close-day — end-of-day roll.
- *
- * Everyone who never tapped in is marked Absent for that date, which is what
- * turns the register into a meaningful percentage.
- */
 router.post(
   "/close-day",
   route(async (req, res) => {
@@ -331,10 +289,6 @@ router.post(
   }),
 );
 
-/**
- * POST /api/attendance/reconcile — realign every stored percentage with the
- * register. Returns only the rows that actually moved.
- */
 router.post(
   "/reconcile",
   route(async (req, res) => {
@@ -343,7 +297,6 @@ router.post(
   }),
 );
 
-/** PATCH /api/attendance/:holderId — manual correction for one person and day. */
 router.patch(
   "/:holderId",
   route(async (req, res) => {

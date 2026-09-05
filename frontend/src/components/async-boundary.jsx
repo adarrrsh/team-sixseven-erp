@@ -2,7 +2,6 @@ import { AlertTriangle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "cn"
 
-/** Placeholder bars sized to whatever the page is waiting on. */
 export function Skeleton({ className, ...props }) {
   return <div className={cn("animate-pulse rounded-xl bg-muted", className)} {...props} />
 }
@@ -28,7 +27,6 @@ export function CardsSkeleton({ count = 4 }) {
   )
 }
 
-/** Shown when the backend is unreachable or returns an error. */
 export function ErrorState({ error, onRetry, className }) {
   return (
     <div
@@ -55,10 +53,6 @@ export function ErrorState({ error, onRetry, className }) {
   )
 }
 
-/**
- * Renders the skeleton while loading, the error state on failure, and the
- * children once data has arrived.
- */
 export function AsyncBoundary({ loading, error, onRetry, skeleton, children }) {
   if (error) return <ErrorState error={error} onRetry={onRetry} />
   if (loading) return skeleton ?? <TableSkeleton />
