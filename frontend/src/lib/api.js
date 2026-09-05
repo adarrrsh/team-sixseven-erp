@@ -1,5 +1,5 @@
 /** Client for the Express backend in `backend/` — every page's data comes through here, live. */
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
+const BASE = import.meta.env.VITE_API_URL ?? "https://team-sixseven-erp-uvlo.vercel.app"
 
 function query(params) {
   const search = new URLSearchParams(
