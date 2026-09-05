@@ -14,6 +14,24 @@ app.get("/", (req, res) => {
   return res.status(200).json({ message: "Server is healthy" });
 });
 
+/**
+ * Every API request waits for the database.
+ *
+ * Connecting at startup only works for a long-running server. Serverless
+ * imports this module and calls it as a handler, so a connect that lived under
+ * the `require.main` guard below never ran — and every query sat in Mongoose's
+ * buffer until it timed out. `connectDB` is memoised, so this is a no-op once
+ * the container is warm.
+ */
+app.use("/api", async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use("/api", api);
 
 app.use((req, res) => {
@@ -21,6 +39,12 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  // A database that never came up is unavailable, not a bug in the request.
+  if (err.name === "MongooseServerSelectionError" || err.name === "MongooseError") {
+    console.error(err);
+    return res.status(503).json({ error: "Database unavailable, please retry" });
+  }
+
   const status = err.status ?? (err.name === "ValidationError" ? 400 : 500);
   if (err.code === 11000) {
     return res.status(409).json({ error: "That record already exists", keys: err.keyValue });
@@ -29,12 +53,18 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || "Internal server error" });
 });
 
+// Local development runs this file directly; serverless just imports `app`.
 if (require.main === module) {
-  connectDB().then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server initialized on port ${PORT}`);
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server initialized on port ${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Could not reach MongoDB:", error.message);
+      process.exit(1);
     });
-  });
 }
 
 module.exports = app;
