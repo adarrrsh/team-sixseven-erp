@@ -48,7 +48,7 @@ export function Chatbot() {
   }
 
   return (
-    <div className="fixed right-5 bottom-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed right-10 bottom-10 z-50 flex flex-col items-end gap-3">
       <AnimatePresence>
         {open ? (
           <motion.div
