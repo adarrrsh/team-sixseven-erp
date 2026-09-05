@@ -1,10 +1,10 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { MessageCircle, Send, X } from "lucide-react"
+import { Check, LifeBuoy, MessageCircle, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { askChatbot } from "@/lib/api"
+import { askChatbot, requestHandoff } from "@/lib/api"
 
 const CANNED = [
   "How do I apply for admission?",
@@ -23,6 +23,11 @@ export function Chatbot() {
   const [draft, setDraft] = useState("")
   const [busy, setBusy] = useState(false)
 
+  /** Set once the bot admits defeat, so the handoff offer appears. */
+  const [stuckOn, setStuckOn] = useState(null)
+  const [handoff, setHandoff] = useState(null) // null | "form" | "sending" | ticket
+  const [email, setEmail] = useState("")
+
   const send = async (text) => {
     const q = (text ?? draft).trim()
     if (!q || busy) return
@@ -30,12 +35,44 @@ export function Chatbot() {
     setLog((l) => [...l, { from: "me", text: q }])
     setBusy(true)
     try {
-      const { reply } = await askChatbot(q)
+      const { reply, isFallback } = await askChatbot(q)
       setLog((l) => [...l, { from: "bot", text: reply || SUPPORT_FALLBACK }])
+      // The bot could not answer — offer a person rather than a dead end.
+      if (isFallback) setStuckOn(q)
     } catch {
       setLog((l) => [...l, { from: "bot", text: SUPPORT_FALLBACK }])
+      setStuckOn(q)
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** Sends the question and the conversation so far to the admin queue. */
+  const escalate = async () => {
+    setHandoff("sending")
+    try {
+      const ticket = await requestHandoff({
+        email,
+        question: stuckOn ?? log.filter((m) => m.from === "me").at(-1)?.text ?? "General enquiry",
+        source: "login",
+        transcript: log.map((m) => ({
+          from: m.from === "me" ? "user" : "bot",
+          text: m.text,
+          at: new Date().toISOString(),
+        })),
+      })
+      setHandoff(ticket)
+      setStuckOn(null)
+      setLog((l) => [
+        ...l,
+        { from: "bot", text: `${ticket.message} Your reference is ${ticket.id}.` },
+      ])
+    } catch {
+      setHandoff(null)
+      setLog((l) => [
+        ...l,
+        { from: "bot", text: "I could not reach the team just now — please email support@origin.edu." },
+      ])
     }
   }
 
@@ -82,6 +119,44 @@ export function Chatbot() {
                   Typing…
                 </div>
               ) : null}
+              {stuckOn && !handoff ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-border bg-secondary p-3">
+                  <span className="text-xs font-medium text-secondary-foreground">
+                    Want a person to look at this?
+                  </span>
+                  <Input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="Your email (optional)"
+                    className="h-8"
+                    aria-label="Your email"
+                  />
+                  <div className="flex gap-1.5">
+                    <Button size="xs" onClick={escalate}>
+                      <LifeBuoy />
+                      Talk to a human
+                    </Button>
+                    <Button size="xs" variant="ghost" onClick={() => setStuckOn(null)}>
+                      No thanks
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {handoff === "sending" ? (
+                <div className="rounded-2xl bg-secondary px-3 py-2 text-xs text-muted-foreground">
+                  Passing this to the team…
+                </div>
+              ) : null}
+
+              {handoff && handoff !== "sending" ? (
+                <div className="flex items-center gap-2 rounded-2xl bg-green-soft px-3 py-2 text-xs text-green-strong">
+                  <Check className="size-3.5" />
+                  Handed to the team · {handoff.id}
+                </div>
+              ) : null}
+
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {CANNED.map((c) => (
                   <button

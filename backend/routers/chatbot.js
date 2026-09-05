@@ -70,7 +70,8 @@ router.post(
     const message = String(req.body?.message ?? "").trim();
     if (!message) throw badRequest("message is required");
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Accept either name: the deployed .env uses GEMINI_KEY.
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY;
     if (!apiKey) return fallback(res);
 
     let upstream;

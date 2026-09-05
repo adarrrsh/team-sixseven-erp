@@ -17,5 +17,6 @@ router.use("/timetable", require("./timetable"));
 router.use("/payments", require("./payments"));
 router.use("/dashboard", require("./dashboard"));
 router.use("/chatbot", require("./chatbot"));
+router.use("/support", require("./support"));
 
 module.exports = router;

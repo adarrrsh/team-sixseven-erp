@@ -11,6 +11,7 @@ import Finances from "@/pages/admin/finances"
 import AdminTimetable from "@/pages/admin/timetable"
 import Examinations from "@/pages/admin/examinations"
 import ScorePage from "@/pages/admin/score"
+import Support from "@/pages/admin/support"
 import FacultyPortal from "@/pages/faculty-portal"
 import StudentPortal from "@/pages/student-portal"
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="timetable" element={<AdminTimetable />} />
         <Route path="examinations" element={<Examinations />} />
         <Route path="score" element={<ScorePage />} />
+        <Route path="support" element={<Support />} />
       </Route>
       <Route path="/faculty/*" element={<FacultyPortal />} />
       <Route path="/student/*" element={<StudentPortal />} />

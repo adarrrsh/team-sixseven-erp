@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
-import {
+import { LifeBuoy,
   BookOpen,
   CalendarDays,
   ClipboardList,
@@ -24,6 +24,7 @@ const NAV = [
   { to: "/admin/timetable", label: "Time-table", icon: CalendarDays },
   { to: "/admin/examinations", label: "Examinations", icon: ClipboardList },
   { to: "/admin/score", label: "Score", icon: Trophy },
+  { to: "/admin/support", label: "Support", icon: LifeBuoy },
 ]
 
 export default function AdminLayout() {
